@@ -10,15 +10,16 @@
  %option noyywrap */
 
  /* Regex definitions from grammar found in IOS/IEC C standard, Appen. A*/
-delim       [ \t\n]
-ws          {delim}+
-nondigit    [a-zA-Z_]
+delim           [ \t\n]
+ws              {delim}+
+nondigit        [a-zA-Z_]
+digit           [0-9]
 
-digit       [0-9]
 integer_val     {digit}+
 double_val      {integer_val}\.{integer_val}?
-
 string_val      \"[^\"]*\"
+
+identifier      {nondigit}+
 
 
  /* Now match and do actions */
@@ -29,6 +30,8 @@ string_val      \"[^\"]*\"
 {double_val}    { yylval.dval = atof(yytext); return DOUBLE_LITERAL; }
 {string_val}    { yylval.cval = strdup(yytext); return CHAR_LITERAL; }
 
+{identifier}    { yylval.cval = strdup(yytext); return IDENTIFIER; }
+
 
     /* Types - TODO: char, float, int, long */
 double      { return DOUBLE_TYPE; }
@@ -38,6 +41,12 @@ int         { return INT_TYPE;    }
     /* Misc. symbols */
 \{          { return OPEN_BRACK; }
 \}          { return CLOSE_BRACK; }
+\(          { return OPEN_PAREN; }
+\)          { return CLOSE_PAREN; }
+
+,           { return COMMA; }
+=           { return ASSIGN_OP; }
+
 .           { /* For anything else, do nothing (TODO: Errors) */ }
 %%
 

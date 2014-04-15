@@ -49,20 +49,30 @@ extern int yydebug;
      INT_LITERAL = 258,
      DOUBLE_LITERAL = 259,
      CHAR_LITERAL = 260,
-     DOUBLE_TYPE = 261,
-     INT_TYPE = 262,
-     OPEN_BRACK = 263,
-     CLOSE_BRACK = 264
+     IDENTIFIER = 261,
+     ASSIGN_OP = 262,
+     DOUBLE_TYPE = 263,
+     INT_TYPE = 264,
+     OPEN_BRACK = 265,
+     CLOSE_BRACK = 266,
+     OPEN_PAREN = 267,
+     CLOSE_PAREN = 268,
+     COMMA = 269
    };
 #endif
 /* Tokens.  */
 #define INT_LITERAL 258
 #define DOUBLE_LITERAL 259
 #define CHAR_LITERAL 260
-#define DOUBLE_TYPE 261
-#define INT_TYPE 262
-#define OPEN_BRACK 263
-#define CLOSE_BRACK 264
+#define IDENTIFIER 261
+#define ASSIGN_OP 262
+#define DOUBLE_TYPE 263
+#define INT_TYPE 264
+#define OPEN_BRACK 265
+#define CLOSE_BRACK 266
+#define OPEN_PAREN 267
+#define CLOSE_PAREN 268
+#define COMMA 269
 
 
 
@@ -78,7 +88,7 @@ typedef union YYSTYPE
 
 
 /* Line 2053 of yacc.c  */
-#line 82 "y.tab.h"
+#line 92 "y.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

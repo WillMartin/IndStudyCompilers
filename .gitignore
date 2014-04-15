@@ -1,1 +1,5 @@
 YaccCompiler/test
+YaccCompiler/lexparser
+YaccCompiler/compilerout
+YaccCompiler/*.o
+YaccCompiler/*.swp
