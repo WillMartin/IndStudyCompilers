@@ -46,16 +46,40 @@ extern int yydebug;
    /* Put the tokens into the symbol table, so that GDB and other debuggers
       know about them.  */
    enum yytokentype {
-     DIGIT = 258
+     INT_LITERAL = 258,
+     DOUBLE_LITERAL = 259,
+     CHAR_LITERAL = 260,
+     DOUBLE_TYPE = 261,
+     INT_TYPE = 262,
+     OPEN_BRACK = 263,
+     CLOSE_BRACK = 264
    };
 #endif
 /* Tokens.  */
-#define DIGIT 258
+#define INT_LITERAL 258
+#define DOUBLE_LITERAL 259
+#define CHAR_LITERAL 260
+#define DOUBLE_TYPE 261
+#define INT_TYPE 262
+#define OPEN_BRACK 263
+#define CLOSE_BRACK 264
 
 
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef int YYSTYPE;
+typedef union YYSTYPE
+{
+/* Line 2053 of yacc.c  */
+#line 13 "C.y"
+ 
+  int ival; 
+  double dval; 
+  char *cval;        
+
+
+/* Line 2053 of yacc.c  */
+#line 82 "y.tab.h"
+} YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
