@@ -1,5 +1,8 @@
-all: y.tab.c lex.yy.c symbol_table.o
-	gcc y.tab.c lex.yy.c symbol_table.o -o compileout `pkg-config --cflags --libs glib-2.0`
+CFLAGS=-std=c99 -g
+GOMPILER=gcc
+
+all: y.tab.c lex.yy.c symbol_table.o inter_code_gen.o
+	gcc $(CFLAGS) y.tab.c lex.yy.c symbol_table.o inter_code_gen.o -o compileout `pkg-config --cflags --libs glib-2.0`
 
 # Compile yacc file to C
 # -d command specifies to create a header with token definitions (y.tab.h)
@@ -14,10 +17,14 @@ lex.yy.c: C.lex y.tab.h symbol_table.o
 
 # Compile all assembly_utils
 assembly_utils.o: assembly_utils.c assembly_utils.h
-	gcc -c assembly_utils.c
+	gcc $(CFLAGS) -c assembly_utils.c
 
 symbol_table.o: symbol_table.c symbol_table.h
-	gcc -c symbol_table.c `pkg-config --cflags --libs glib-2.0`
+	gcc $(CFLAGS) -c symbol_table.c `pkg-config --cflags --libs glib-2.0`
+
+inter_code_gen.o: symbol_table.h symbol_table.c inter_code_gen.c inter_code_gen.h
+	gcc $(CFLAGS) -c  inter_code_gen.c symbol_table.c `pkg-config --cflags --libs glib-2.0`
+
 
 clean:
 	rm -f *.o lex.yy.c y.tab.c t.tab.h

@@ -2,8 +2,13 @@
  /* Manifest constants go here (Can be returned later) */
 %{ 
 #include <stdio.h>
-#include "y.tab.h"
+#include <stdlib.h>
+#include <string.h>
+// Important that it goes in this order (otherwise structrs from symbol_table are declared undefined)
 #include "symbol_table.h"
+#include "y.tab.h"
+
+extern int yylex();
 %}
  
  /* This tells flex to read only one input file 
@@ -30,23 +35,18 @@ identifier      {nondigit}+
 {double_val}    { yylval.dval = atof(yytext); return DOUBLE_LITERAL; }
 {string_val}    { yylval.cval = strdup(yytext); return CHAR_LITERAL; }
 
-{identifier}    { yylval.cval = strdup(yytext); return IDENTIFIER; }
-
-
     /* Types - TODO: char, float, int, long */
 double      { return DOUBLE_TYPE; }
 int         { return INT_TYPE;    }
 
-
-    /* Misc. symbols */
-\{          { return OPEN_BRACK; }
-\}          { return CLOSE_BRACK; }
-\(          { return OPEN_PAREN; }
-\)          { return CLOSE_PAREN; }
-
-,           { return COMMA; }
+    /* TODO: Add a bunch of other assign operators */
 =           { return ASSIGN_OP; }
 
-.           { /* For anything else, do nothing (TODO: Errors) */ }
+    /* Important this this goes below any reserved keys (matches all char strings) */
+{identifier}    { yylval.cval = strdup(yytext); return IDENTIFIER; }
+
+    /* For anything else, pass it to YACC to deal with */
+.           { return yytext[0]; }
+
 %%
 

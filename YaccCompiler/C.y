@@ -3,6 +3,12 @@
     /* Declarations: includes, globals */
 #include <stdio.h>
 #include "symbol_table.h"
+#include "inter_code_gen.h"
+    
+    // Declare some useful globals when parsing
+GPtrArray *instr_list;
+int num_instrs;
+GHashTable *symbol_table;
 %}
 
 /* Define start symbol */
@@ -14,9 +20,10 @@
   int ival; 
   double dval; 
   char *cval;        
+  Identifier *idval;
 }
 /* Define a type for non-terms (?) */
-%type <cval> id
+%type <idval> id
 
 /* Define tokens */
 %token <ival> INT_LITERAL
@@ -25,7 +32,7 @@
 %token <cval> IDENTIFIER
 %token <cval> ASSIGN_OP
 
-%token DOUBLE_TYPE INT_TYPE OPEN_BRACK CLOSE_BRACK OPEN_PAREN CLOSE_PAREN COMMA
+%token DOUBLE_TYPE INT_TYPE 
 
 /* Define operators and their precedence */
 
@@ -34,17 +41,32 @@
 primary_expression:
               id 
             | literal
-            | OPEN_PAREN expression CLOSE_PAREN
+            | '(' expression ')'
 
 expression:       
               assignment_expression
-            | expression COMMA assignment_expression 
+            | expression ',' assignment_expression 
             ;
 
 assignment_expression:
               id ASSIGN_OP assignment_expression
               {
-                    printf("Assign:(%s->)", $1);
+                    //printf("Assign:(%s->)", $1);
+                    printf("Assign:(%s, %p)\n", $1->symbol, $1);
+                    Instruction *instr = malloc(sizeof(Instruction));
+                    instr->op_code = ASSIGN;
+
+                    Arg arg1;
+                    arg1.type = IDENT;
+                    arg1.ident_val = $1;
+
+                    Arg arg2;
+                    arg2.type = CONST; //???
+                    arg2.const_val = 8;
+
+                    instr->arg1 = arg1;
+                    instr->arg2 = arg2;
+                    add_instr(instr_list, &num_instrs, instr);
               }
             |
             ;
@@ -72,7 +94,16 @@ string:     CHAR_LITERAL
 
 id:         IDENTIFIER
             {
-                printf("<id:%s>", $1);
+                Identifier *sym_id;
+                sym_id = get_identifier(symbol_table, $1);
+
+                if (sym_id == NULL)
+                {
+                    sym_id = put_symbol(symbol_table, $1, INTEGER);
+                }
+
+                printf("<id:%s>\n", $1);
+                $$ = sym_id;
             };
 %%
 
@@ -86,10 +117,16 @@ int yywrap()
 {
     return 1;
 } 
-   
-main()
+  
+
+int main()
 {
-    gen_symbol_table();
+    // Init globals
+    symbol_table = init_symbol_table();
+    instr_list = init_instr_list();
+    num_instrs = 0;
+
     yyparse();
-    printf("\n\n");
+ 
+    print_instr_list(instr_list, num_instrs);
 } 

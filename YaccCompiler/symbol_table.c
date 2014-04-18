@@ -1,23 +1,23 @@
 #include "symbol_table.h"
 
-// Hold on to the table so we don't have to pass it everywhere.
-GHashTable *_table;
-
-GHashTable *gen_symbol_table()
+GHashTable *init_symbol_table()
 {
-    _table = g_hash_table_new_full(g_int_hash, 
-                                   g_int_equal, 
-                                   NULL, 
-                                   g_free);
-    return _table;
+    return g_hash_table_new_full(g_str_hash, 
+                                 g_str_equal, 
+                                 NULL, 
+                                 g_free);
 }
 
-char *get_symbol(int key)
+Identifier *get_identifier(GHashTable *sym_table, char* sym)
 {
-    return ((attr*) g_hash_table_lookup(_table, GINT_TO_POINTER(key)))->symbol;
+    return (Identifier*) g_hash_table_lookup(sym_table, sym);
 }
 
-void put_symbol(int key, char *symbol)
+Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type)
 {
-    g_hash_table_insert(_table, GINT_TO_POINTER(key), symbol);
+    Identifier *id = malloc(sizeof(Identifier));
+    id->symbol = symbol;
+    id->type = type;
+    g_hash_table_insert(sym_table, symbol, id);
+    return id;
 }
