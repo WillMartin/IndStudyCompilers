@@ -6,6 +6,7 @@
 #include <string.h>
 // Important that it goes in this order (otherwise structrs from symbol_table are declared undefined)
 #include "symbol_table.h"
+#include "inter_code_gen.h"
 #include "y.tab.h"
 
 extern int yylex();
@@ -23,6 +24,7 @@ digit           [0-9]
 integer_val     {digit}+
 double_val      {integer_val}\.{integer_val}?
 string_val      \"[^\"]*\"
+long_val        {integer_val}l
 
 identifier      {nondigit}+
 
@@ -33,11 +35,13 @@ identifier      {nondigit}+
 
 {integer_val}   { yylval.ival = atoi(yytext); return INT_LITERAL; }
 {double_val}    { yylval.dval = atof(yytext); return DOUBLE_LITERAL; }
+{long_val}      { yylval.dval = atol(yytext); return LONG_LITERAL; }
 {string_val}    { yylval.cval = strdup(yytext); return CHAR_LITERAL; }
 
     /* Types - TODO: char, float, int, long */
 double      { return DOUBLE_TYPE; }
 int         { return INT_TYPE;    }
+long        { return LONG_TYPE;    }
 
     /* TODO: Add a bunch of other assign operators */
 =           { return ASSIGN_OP; }

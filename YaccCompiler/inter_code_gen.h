@@ -21,10 +21,21 @@ typedef enum eOPCode
     UMINUS, // unary minus sign
 } eOPCode;
 
+typedef struct Constant
+{
+    eType type;
+    union
+    {
+        int int_val;
+        double float_val;
+        char *str_val;
+        long long_val;
+    };
+} Constant;
+
 typedef enum eArgType
 {
-    CONST, // For now this is just going to be an int..
-    //STATIC,  // TODO: Read about statics, probably put in another table
+    CONST, 
     INSTR, // A pointer to an Instruction struct 
     IDENT, // A pointer to an Ident struct (symbol_table.h)
 } eArgType;
@@ -33,12 +44,14 @@ typedef enum eArgType
 typedef struct Arg 
 {
     eArgType type;     
-    union {
-        int const_val; // For now we'll just allow integer constants
+    union 
+    {
+        Constant const_val; // For now we'll just allow integer constants
         struct Instruction *instr_val;
         Identifier *ident_val;
     };
 } Arg;
+
 
 // Represents an instruction as a generic Indirect-Triplet
 typedef struct Instruction

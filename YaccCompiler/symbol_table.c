@@ -13,6 +13,11 @@ Identifier *get_identifier(GHashTable *sym_table, char* sym)
     return (Identifier*) g_hash_table_lookup(sym_table, sym);
 }
 
+void put_identifier(GHashTable *sym_table, Identifier *id)
+{
+    g_hash_table_insert(sym_table, id->symbol, id);
+}
+
 Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type)
 {
     Identifier *id = malloc(sizeof(Identifier));
