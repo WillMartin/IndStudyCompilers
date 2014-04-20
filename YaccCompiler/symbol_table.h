@@ -12,7 +12,7 @@ typedef enum eType
 {
     INTEGER,
     DOUBLE,
-    STRING,
+    CHAR,
     LONG,
     UNINITIALIZED,
 } eType;

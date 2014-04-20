@@ -16,34 +16,33 @@ void add_instr(GPtrArray *instr_list, int *num_instrs, Instruction *instr)
 
 char *get_constant_repr(Constant c)
 {
-    char *repr;
+    // Little janky but it should work
+    char *repr = malloc(50 * sizeof(char));
     switch (c.type)
     {
         case INTEGER:
-            repr = malloc(sizeof(char));
             sprintf(repr, "%d", c.int_val);
             break;
         case DOUBLE:
-            repr = malloc(sizeof(char));
             sprintf(repr, "%f", c.float_val);
             break;
         case LONG:
-            repr = malloc(sizeof(char));
             sprintf(repr, "%lu", c.long_val);
             break;
-        case STRING:
-            repr = c.str_val;
+        case CHAR:
+            return c.str_val;
             break; 
         default:
-            repr = "CONSTANT-ERROR";
+            return "CONSTANT-ERROR";
             break;
     }
+
     return repr;
 }
 
 char *get_arg_repr(Arg arg)
 {
-    char *repr;
+    char *repr = NULL;
     switch (arg.type)
     {
         case CONST:
@@ -53,11 +52,10 @@ char *get_arg_repr(Arg arg)
             repr = "INSTR";
             break;
         case IDENT:
-            //repr = "IDENT";
             repr = arg.ident_val->symbol;
             break;
         default:
-            repr = "UNKOWN";
+            sprintf(repr, "UNKNOWN: %d", arg.type);
             break;
     }
     return repr;
@@ -74,3 +72,44 @@ void print_instr_list(GPtrArray *instr_list, int num_instrs)
                 get_arg_repr(instr->arg1),get_arg_repr(instr->arg2));
     }
 }
+
+Instruction *init_instruction(eOPCode op_code, Arg arg1, Arg arg2)
+{
+    Instruction *instr = malloc(sizeof(Instruction));
+    instr->op_code = op_code;
+    instr->arg1 = arg1;
+    instr->arg2 = arg2;
+    return instr;
+}
+
+/* Returns instruction set to perform cast
+   Returns NULL if the operation is unsuccessful 
+        (e.g. wrong arg types)
+*/
+Instruction *gen_cast_instr(Arg arg, eOPCode desired_type)
+{
+    //TODO: implement this ... at all
+    Arg a;
+    return init_instruction(CAST, arg, a);
+}
+
+/* Returns instruction set to perform multiplication 
+   Returns NULL if the operation is unsuccessful 
+        (e.g. wrong arg types)
+*/
+Instruction *gen_additive_instr(Arg arg1, Arg arg2)
+{
+    //TODO: implement this more fully
+    return init_instruction(ADD, arg1, arg2);
+}
+
+/* Returns instruction set to perform multiplication 
+   Returns NULL if the operation is unsuccessful 
+        (e.g. wrong arg types)
+*/
+Instruction *gen_multiplicative_instr(Arg arg1, Arg arg2)
+{
+    //TODO: implement this more fully 
+    return init_instruction(MULT, arg1, arg2);
+}
+

@@ -5,6 +5,7 @@
 
 #include "symbol_table.h"
 #include <stdlib.h>
+#include <string.h>
 #include <glib.h>
 
 struct Arg;
@@ -15,9 +16,10 @@ typedef enum eOPCode
 {
     ASSIGN,
     ADD,
-    SUB,
-    MULT,
+    CAST,
     DIV,
+    MULT,
+    SUB,
     UMINUS, // unary minus sign
 } eOPCode;
 
@@ -64,4 +66,9 @@ typedef struct Instruction
 GPtrArray *init_instr_list();
 void add_instr(GPtrArray *instr_list, int *num_instrs, Instruction* instr);
 void print_instr_list(GPtrArray *instr_list, int num_instrs);
+
+Instruction *init_instruction(eOPCode op_code, Arg arg1, Arg arg2);
+Instruction *gen_additive_instr(Arg arg1, Arg arg);
+Instruction *gen_multiplicative_instr(Arg arg1, Arg arg);
+
 #endif // INTER_CODE_GEN

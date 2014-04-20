@@ -29,7 +29,8 @@ GHashTable *symbol_table;
 }
 /* Define a type for non-terms (?) */
 %type <idval> id
-%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer
+%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression
+ 
 %type <tval> type_specifier
 
 /* Define tokens */
@@ -40,7 +41,7 @@ GHashTable *symbol_table;
 %token <cval> IDENTIFIER
 %token <cval> ASSIGN_OP
 
-%token DOUBLE_TYPE INT_TYPE LONG_TYPE
+%token DOUBLE_TYPE INT_TYPE LONG_TYPE CHAR_TYPE
 
 /* Define operators and their precedence */
 
@@ -53,6 +54,9 @@ statement:
 
 compound_statement:
               '{' block_item_list '}'
+              {
+                  $$ = $2;
+              }
             ;
 block_item_list:
               block_item
@@ -64,33 +68,70 @@ block_item:
             | statement
             ;
 
-primary_expression:
-              id 
-            | literal
-            | '(' expression ')'
 
 expression:       
               assignment_expression
-            | primary_expression
             ;
 
+additive_expression:
+              multiplicative_expression
+            | additive_expression '+' multiplicative_expression
+              {
+                  Instruction *instr = gen_additive_instr($1, $3);
+
+                  if (add_instr == NULL) 
+                  { 
+                      printf("INVALID ADD\n"); 
+                  } 
+                  else
+                  {
+                      add_instr(instr_list, &num_instrs, instr);
+                  }
+
+                  $$ = (Arg) { .type=INSTR, .instr_val=instr };
+              }
+            ;
+            
+multiplicative_expression:
+              primary_expression
+            | multiplicative_expression '*' primary_expression
+              {
+                  Instruction *mult_instr = gen_multiplicative_instr($1, $3);
+
+                  if (mult_instr == NULL) 
+                  { 
+                      printf("INVALID MULTIPLY\n"); 
+                  } 
+                  else
+                  {
+                      add_instr(instr_list, &num_instrs, mult_instr);
+                  }
+
+                  $$ = (Arg) { .type=INSTR, .instr_val=mult_instr };
+              }
+            ;
+
+primary_expression:
+              id 
+              {
+                   $$ = (Arg) { .type=IDENT, .ident_val=$1 };
+              }
+            | literal
+            | '(' expression ')'
+              {
+                  $$ = $2;
+              }
+
 assignment_expression:
+              additive_expression 
               /* TODO: id should be unary-expression */
-              id ASSIGN_OP expression 
+            | id ASSIGN_OP expression 
               {
                   if ($1->type == UNINITIALIZED) { printf("ERROR: use of undeclared id: %s\n", $1->symbol); }
 
                   printf("Assign:(%s, %p)\n", $1->symbol, $1);
-                  Instruction *instr = malloc(sizeof(Instruction));
-                  instr->op_code = ASSIGN;
-
-                  Arg arg1;
-                  arg1.type = IDENT;
-                  arg1.ident_val = $1;
-
-                  instr->arg1 = arg1;
-                  // assignment_expresssion will return an argument
-                  instr->arg2 = $3;
+                  Arg arg1 = { .type=IDENT, .ident_val=$1 };
+                  Instruction *instr = init_instruction(ASSIGN, arg1, $3);
                   add_instr(instr_list, &num_instrs, instr);
 
                   $$ = (Arg) { .type=INSTR, .instr_val=instr };
@@ -109,10 +150,7 @@ declaration:
                   put_identifier(symbol_table, id);
                   Arg id_arg = { .type=IDENT, .ident_val=id };
 
-                  Instruction *instr = malloc(sizeof(Instruction));
-                  instr->op_code = ASSIGN;
-                  instr->arg1 = id_arg;
-                  instr->arg2 = $4;
+                  Instruction *instr = init_instruction(ASSIGN, id_arg, $4);
                   add_instr(instr_list, &num_instrs, instr);
 
                   $$ = (Arg) { .type=INSTR, .instr_val=instr };
@@ -120,6 +158,7 @@ declaration:
               ;
 
  /* Declarator for now can just be ID, should be more 
+
     Moved to declaration for simplicitry. Can only initialize as int x = 5;
 init_declaration_list:
               id
@@ -136,13 +175,14 @@ init_declaration_list:
 
 /* For now, just allow initialization to a primary expression */
 initializer:
-            primary_expression                
+            expression                
             ;
 
 type_specifier: 
               INT_TYPE      { $$ = INTEGER; }
             | DOUBLE_TYPE   { $$ = DOUBLE;  }
             | LONG_TYPE     { $$ = LONG;    }
+            | CHAR_TYPE     { $$ = CHAR;    }
             ;
 
 literal:      INT_LITERAL
@@ -164,7 +204,7 @@ literal:      INT_LITERAL
               }
             | CHAR_LITERAL
               {
-                  Constant cons = { .type=STRING, .str_val=$1 };
+                  Constant cons = { .type=CHAR, .str_val=$1 };
                   $$ = (Arg) { .type=CONST, .const_val=cons };
               }
             ;
