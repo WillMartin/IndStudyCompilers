@@ -1,5 +1,6 @@
-YaccCompiler/test
-YaccCompiler/lexparser
-YaccCompiler/compilerout
-YaccCompiler/*.o
-YaccCompiler/*.swp
+compileout
+*.o
+*.swp
+lex.yy.c
+y.tab.c
+y.tab.h

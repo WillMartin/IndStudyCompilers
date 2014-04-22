@@ -1,8 +1,0 @@
-{
-    // test
-    long x = 5; // in line comment
-
-    /* x = 3; */
-    /* // comments on comments */
-
-}

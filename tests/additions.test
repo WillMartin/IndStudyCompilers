@@ -1,0 +1,17 @@
+{
+    int a = 4;
+    int b = 6;
+
+    int c = a + b;
+    a = a + b;
+    a = b + b;
+    a = a + a;
+
+    long d = 120;
+    d = a + b;
+    long e = 1234;
+    e = d + a;
+
+    e = 1 + 2 + 3;
+    e = 1 + 2.12312 + 3;
+}
