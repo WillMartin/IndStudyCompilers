@@ -73,18 +73,18 @@ char *get_assembly_type(eType type)
 }
 
 
-void write_1instr(FILE *fp, char *command, char *arg)
+void write_1instr(FILE *fp, const char *command, char *arg)
 {
     fprintf(fp, "\t%s %s\n", command, arg); 
 }
 
-void write_2instr(FILE *fp, char *command,
+void write_2instr(FILE *fp, const char *command,
                   char *arg1, char *arg2)
 {
     fprintf(fp, "\t%s %s, %s\n", command, arg1, arg2); 
 }
 
-void write_3instr(FILE *fp, char *command, 
+void write_3instr(FILE *fp, const char *command, 
                   char *result, char *arg1, char *arg2)
 {
     fprintf(fp, "\t%s %s, %s, %s\n", command, result, arg1, arg2); 
@@ -99,32 +99,105 @@ GHashTable *address_local_variables(FILE *fp, GHashTable *symbol_table)
 
 }
 
+char *addr_ind(const char *reg)
+{
+    char *repr = malloc(sizeof(strlen(reg) + 3));
+    sprintf(repr, "[%s]", reg);
+    return repr;
+}
+
+char *addr_mult(const char *reg, int fact)
+{
+    // Assuming fact are less than 1,000 in this case
+    char *repr = malloc(sizeof(strlen(reg)) + 5);
+    sprintf(repr,"%s*%d", reg, fact);
+    return repr;
+}
+
+char *addr_add(const char *reg, int offset)
+{
+    // Assuming offsets are less than 1,000 in this case
+    char *repr = malloc(sizeof(strlen(reg)) + 5);
+    if (offset < 0) { sprintf(repr,"%s-%d", reg, offset); }
+    else if (offset > 0) { sprintf(repr,"%s+%d", reg, offset); }
+    else { sprintf(repr, "%s", reg); }
+
+    return repr;
+}
+
+
+
+char *char_int(int x) 
+{
+    char *repr = malloc(sizeof(char)*10);
+    sprintf(repr, "%d", x);
+    return repr;
+}
+
+char *char_double(double x) 
+{
+    char *repr = malloc(sizeof(char)*10);
+    sprintf(repr, "%f", x);
+    return repr;
+}
+
+char *char_const(Constant *c)
+{
+    char *repr;
+
+    switch (c->type)
+    {
+        case INTEGER:
+            repr = char_int(c->int_val);
+            break;
+        case DOUBLE:
+            repr = char_double(c->float_val);
+            break;
+        case CHAR:
+            repr = c->str_val;
+            break;
+        case LONG:
+            // TODO: give long's their own method
+            repr = char_int(c->int_val); 
+            break;
+        default:
+            printf("CHAR_CONSTANT ERROR: unknown type");
+            repr = "UH OH";
+            break;
+    }
+    return repr;
+}
+
 /**
- *  Write local variables to the stack. 
+ *  Make room for local variables
  */
 void write_local_variables(FILE *fp, GHashTable *address_table)
 {
     //TODO: change this to local identifiers eventually
     GList *local_ids = get_all_identifiers(address_table);
 
+    int offset = 0;
     for (; local_ids != NULL; local_ids = local_ids->next)
     {
-        int size = get_byte_size(((Identifier *) local_ids->data)->type);
-        
+        int new_offset = ((Identifier *) local_ids->data)->offset;
+        if (new_offset > offset)
+        {
+            offset = new_offset;
+        }
+
+        //write_2instr(fp, SUB_INSTR, ESP_REGISTER, char_offset);
+    }
+
+    if (offset > 0)
+    {
+        char *char_offset = char_int(offset);
+        write_2instr(fp, SUB_INSTR, ESP_REGISTER, char_offset);
     }
 }
 
 // Push's down stack frame and adds memory for all local variables
 void write_activation_record(FILE *fp, GHashTable *symbol_table)
 {
-}
-
-// Write instructions
-void write_code(FILE *fp, GPtrArray *instr_list)
-{
-
-
-
 }
 
 // I don't think this is a great technique, but I want to get something working
@@ -150,12 +223,78 @@ void init_registers()
     }
 }
 
-// Recursively descend instruction list
-void traverse_instructions(Instruction *instr, FILE fp)
+char *repr_op_code(eOPCode op_code)
 {
-         
+    char *repr;
+    switch (op_code)
+    {
+        case ASSIGN:
+            repr = MOVE_INSTR;
+            break;
+        case ADD:
+            repr = ADD_INSTR;
+            break;
+        case SUB:
+            repr = SUB_INSTR;
+            break;
+        default:
+            repr = "NOT IMPLEMENTED";
+            break;
+    }
+    return repr;
 }
 
+// Recursively descend instruction list
+// Set pointers to NULL once they've been written
+// Do the postorder traversal
+void traverse_instructions(FILE *fp, Instruction *instr)
+{
+    Arg *cur_arg = instr->arg1;
+
+    char *arg_reprs[2];
+    for (int i=0; i < 2; i++)
+    {
+        if (cur_arg == NULL)
+        {
+            printf("WARNING: Argument empty\n");
+            arg_reprs[i] = NULL;
+            continue;
+        }
+
+        switch (cur_arg->type)
+        {
+            case CONST:
+                arg_reprs[i] = char_const(cur_arg->const_val);
+                break;
+            case INSTR:            
+                // Recurse!
+                arg_reprs[i] = "poop";
+                break;
+            case IDENT:
+                // TODO: make this good
+                arg_reprs[i] = cur_arg->ident_val->symbol;
+                break;
+            default:
+                printf("ERROR: Traverse Instructions, unknown type\n");
+                break;
+        }
+        cur_arg = instr->arg2;
+    }
+
+    char *op_code = repr_op_code(instr->op_code);
+
+    // First arg should NEVER be null. Second arg could be (inefficient assign)
+    assert(arg_reprs[0] != NULL);
+
+    if (arg_reprs[1] == NULL)
+    {
+        write_1instr(fp, op_code, arg_reprs[0]);
+    }
+    else
+    {
+        write_2instr(fp, op_code, arg_reprs[0], arg_reprs[1]);
+    }
+}
 
 void compile(GPtrArray *instr_list, GHashTable* symbol_table,
              int num_instrs, char *out_file)
@@ -168,7 +307,8 @@ void compile(GPtrArray *instr_list, GHashTable* symbol_table,
 
     FILE *file = fopen(out_file, "w+");
     init_registers();
-    init_data_section(symbol_table, file);
+    //init_data_section(symbol_table, file);
+    write_local_variables(file, symbol_table);
 
     Instruction *cur_instr = get_instr(instr_list, num_instrs, 0);
 

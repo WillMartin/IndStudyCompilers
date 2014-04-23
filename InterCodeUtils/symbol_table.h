@@ -20,7 +20,6 @@ typedef enum eType
     DOUBLE,
     CHAR,
     LONG,
-    UNINITIALIZED,
 } eType;
 
 // Where the data is allocated

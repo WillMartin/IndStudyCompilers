@@ -9,6 +9,9 @@
     // Declare some useful globals when parsing
 GPtrArray *instr_list;
 int num_instrs;
+// Should be reset at every new stack frame
+// Assign then increment
+int stack_offset;
 GHashTable *symbol_table;
 %}
 
@@ -23,7 +26,7 @@ GHashTable *symbol_table;
   char *cval;        
   long lval;
 
-  Arg argval;
+  Arg *argval;
   Identifier *idval;
   Instruction *insval;
   eType tval;
@@ -89,7 +92,10 @@ additive_expression:
                       add_instr(instr_list, &num_instrs, instr);
                   }
 
-                  $$ = (Arg) { .type=INSTR, .instr_val=instr };
+                  Arg *arg = malloc(sizeof(Arg));
+                  arg->type = INSTR;
+                  arg->instr_val=instr;
+                  $$ = arg;
               }
             ;
             
@@ -108,14 +114,21 @@ multiplicative_expression:
                       add_instr(instr_list, &num_instrs, mult_instr);
                   }
 
-                  $$ = (Arg) { .type=INSTR, .instr_val=mult_instr };
+                  Arg *arg = malloc(sizeof(Arg));
+                  arg->type = INSTR;
+                  arg->instr_val = mult_instr;
+                  $$ = arg;
               }
             ;
 
 primary_expression:
               id 
               {
-                   $$ = (Arg) { .type=IDENT, .ident_val=$1 };
+                  Arg *arg = malloc(sizeof(Arg));
+                  arg->type = IDENT;
+                  arg->ident_val = $1;
+                  $$ = arg;
+
               }
             | literal
             | '(' expression ')'
@@ -128,33 +141,53 @@ assignment_expression:
               /* TODO: id should be unary-expression */
             | id ASSIGN_OP expression 
               {
-                  if ($1->type == UNINITIALIZED) { printf("ERROR: use of undeclared id: %s\n", $1->symbol); }
+                  Arg *arg1 = malloc(sizeof(Arg));
+                  arg1->type = IDENT;
+                  arg1->ident_val = $1;
 
-                  //printf("Assign:(%s, %p)\n", $1->symbol, $1);
-                  Arg arg1 = { .type=IDENT, .ident_val=$1 };
                   Instruction *instr = init_instruction(ASSIGN, arg1, $3);
                   add_instr(instr_list, &num_instrs, instr);
 
-                  $$ = (Arg) { .type=INSTR, .instr_val=instr };
+                  Arg *ret_arg = malloc(sizeof(Arg));
+                  ret_arg->type = INSTR;
+                  ret_arg->instr_val = instr;
+                  $$ = ret_arg;
               }
             ;
 
 declaration:
                 /* Clearly a subset as there are many more possible declerations */
-              type_specifier id ASSIGN_OP initializer ';'
+              type_specifier IDENTIFIER ASSIGN_OP initializer ';'
               {
-                  Identifier *id = $2;
-                  //TODO: If ID exists, throw an error
-                  if (id->type != UNINITIALIZED) { printf("ERROR: already declared id! %s", id->symbol); }
+                  Identifier *id = get_identifier(symbol_table, $2);
 
+                  if (id != NULL)
+                  {
+                      yyerror("Previously declared identifier");
+                      YYERROR;
+                  }
+
+                  id = malloc(sizeof(Identifier));
                   id->type = $1;
+                  id->symbol = $2;
+                  // For now allocate everything to the stack
+                  id->location = STACK;
+                  id->offset = stack_offset;
+                  stack_offset += get_byte_size($1);
+
                   put_identifier(symbol_table, id);
-                  Arg id_arg = { .type=IDENT, .ident_val=id };
+
+                  Arg *id_arg = malloc(sizeof(Arg));
+                  id_arg->type = IDENT;
+                  id_arg->ident_val = id;
 
                   Instruction *instr = init_instruction(ASSIGN, id_arg, $4);
                   add_instr(instr_list, &num_instrs, instr);
 
-                  $$ = (Arg) { .type=INSTR, .instr_val=instr };
+
+                  $$ = malloc(sizeof(Arg));
+                  $$->type = INSTR;
+                  $$->instr_val = instr;
               }
               ;
 
@@ -188,45 +221,60 @@ type_specifier:
 
 literal:      INT_LITERAL
               {
-                  Constant cons = { .type=INTEGER, .int_val=$1 };
-                  $$ = (Arg) { .type=CONST, .const_val=cons };
+                  Constant *cons = malloc(sizeof(Constant));
+                  cons->type = INTEGER;
+                  cons->int_val = $1;
 
+                  $$ = malloc(sizeof(Arg));
+                  $$->type = CONST;
+                  $$->const_val = cons;
               }
             | DOUBLE_LITERAL
               {
-                  Constant cons = { .type=DOUBLE, .float_val=$1 };
-                  $$ = (Arg) { .type=CONST, .const_val=cons };
+                  Constant *cons = malloc(sizeof(Constant));
+                  cons->type = DOUBLE;
+                  cons->int_val = $1;
 
+                  $$ = malloc(sizeof(Arg));
+                  $$->type = CONST;
+                  $$->const_val = cons;
               }
             | LONG_LITERAL
               {
-                  Constant cons = { .type=LONG, .long_val=$1 };
-                  $$ = (Arg) { .type=CONST, .const_val=cons };
+                  Constant *cons = malloc(sizeof(Constant));
+                  cons->type = LONG;
+                  cons->long_val = $1;
+
+                  $$ = malloc(sizeof(Arg));
+                  $$->type = CONST;
+                  $$->const_val = cons;
               }
             | CHAR_LITERAL
               {
-                  Constant cons = { .type=CHAR, .str_val=$1 };
-                  $$ = (Arg) { .type=CONST, .const_val=cons };
+                  Constant *cons = malloc(sizeof(Constant));
+                  cons->type = CHAR;
+                  cons->str_val = $1;
+
+                  $$ = malloc(sizeof(Arg));
+                  $$->type = CONST;
+                  $$->const_val = cons;
               }
             ;
 
+
+
 id:         IDENTIFIER
             {
-                // Attempts to grab symbol_id from table. If not there create a new
-                // Uninitialized one
+                // Attempts to grab symbol_id from table. If not there, return
+                // an error (unitialized).
 
-                Identifier *sym_id;
-                sym_id = get_identifier(symbol_table, $1);
+                $$ = get_identifier(symbol_table, $1);
 
-                if (sym_id == NULL)
+                if ($$ == NULL)
                 {
-                    sym_id = malloc(sizeof(Identifier));
-                    sym_id->symbol = $1;
-                    // Set to NULL representing uninitialized type
-                    sym_id->type = UNINITIALIZED; 
-                }
-
-                $$ = sym_id;
+                    yyerror("Use of uninitialized value");
+                    YYERROR;
+                } 
             };
 %%
 
@@ -248,9 +296,10 @@ int main()
     symbol_table = init_symbol_table();
     instr_list = init_instr_list();
     num_instrs = 0;
+    stack_offset = 0;
 
     yyparse();
  
     print_instr_list(instr_list, num_instrs);
-    //compile(instr_list, symbol_table, num_instrs, "test.out");
+    compile(instr_list, symbol_table, num_instrs, "test.out");
 } 

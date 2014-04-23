@@ -48,7 +48,7 @@ typedef struct Arg
     eArgType type;     
     union 
     {
-        Constant const_val; // For now we'll just allow integer constants
+        Constant *const_val; // For now we'll just allow integer constants
         struct Instruction *instr_val;
         Identifier *ident_val;
     };
@@ -59,8 +59,8 @@ typedef struct Arg
 typedef struct Instruction
 {
     eOPCode op_code;
-    Arg arg1;
-    Arg arg2;
+    Arg *arg1;
+    Arg *arg2;
 } Instruction;
 
 GPtrArray *init_instr_list();
@@ -68,8 +68,8 @@ void add_instr(GPtrArray *instr_list, int *num_instrs, Instruction* instr);
 Instruction *get_instr(GPtrArray *instr_list, int num_instrs, int index);
 void print_instr_list(GPtrArray *instr_list, int num_instrs);
 
-Instruction *init_instruction(eOPCode op_code, Arg arg1, Arg arg2);
-Instruction *gen_additive_instr(Arg arg1, Arg arg);
-Instruction *gen_multiplicative_instr(Arg arg1, Arg arg);
+Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2);
+Instruction *gen_additive_instr(Arg *arg1, Arg *arg);
+Instruction *gen_multiplicative_instr(Arg *arg1, Arg *arg);
 
 #endif // INTER_CODE_GEN

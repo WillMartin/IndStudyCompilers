@@ -22,23 +22,23 @@ Instruction *get_instr(GPtrArray *instr_list, int num_instrs, int index)
     return (Instruction *) g_ptr_array_index(instr_list, index);
 }
 
-char *get_constant_repr(Constant c)
+char *get_constant_repr(Constant *c)
 {
     // Little janky but it should work
     char *repr = malloc(50 * sizeof(char));
-    switch (c.type)
+    switch (c->type)
     {
         case INTEGER:
-            sprintf(repr, "%d", c.int_val);
+            sprintf(repr, "%d", c->int_val);
             break;
         case DOUBLE:
-            sprintf(repr, "%f", c.float_val);
+            sprintf(repr, "%f", c->float_val);
             break;
         case LONG:
-            sprintf(repr, "%lu", c.long_val);
+            sprintf(repr, "%lu", c->long_val);
             break;
         case CHAR:
-            return c.str_val;
+            return c->str_val;
             break; 
         default:
             return "CONSTANT-ERROR";
@@ -48,22 +48,22 @@ char *get_constant_repr(Constant c)
     return repr;
 }
 
-char *get_arg_repr(Arg arg)
+char *get_arg_repr(Arg *arg)
 {
     char *repr = NULL;
-    switch (arg.type)
+    switch (arg->type)
     {
         case CONST:
-            repr = get_constant_repr(arg.const_val);
+            repr = get_constant_repr(arg->const_val);
             break;
         case INSTR:
             repr = "INSTR";
             break;
         case IDENT:
-            repr = arg.ident_val->symbol;
+            repr = arg->ident_val->symbol;
             break;
         default:
-            sprintf(repr, "UNKNOWN: %d", arg.type);
+            sprintf(repr, "UNKNOWN: %d", arg->type);
             break;
     }
     return repr;
@@ -81,7 +81,7 @@ void print_instr_list(GPtrArray *instr_list, int num_instrs)
     }
 }
 
-Instruction *init_instruction(eOPCode op_code, Arg arg1, Arg arg2)
+Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2)
 {
     Instruction *instr = malloc(sizeof(Instruction));
     instr->op_code = op_code;
@@ -94,18 +94,17 @@ Instruction *init_instruction(eOPCode op_code, Arg arg1, Arg arg2)
    Returns NULL if the operation is unsuccessful 
         (e.g. wrong arg types)
 */
-Instruction *gen_cast_instr(Arg arg, eOPCode desired_type)
+Instruction *gen_cast_instr(Arg *arg, eOPCode desired_type)
 {
     //TODO: implement this ... at all
-    Arg a;
-    return init_instruction(CAST, arg, a);
+    return init_instruction(CAST, arg, NULL);
 }
 
 /* Returns instruction set to perform multiplication 
    Returns NULL if the operation is unsuccessful 
         (e.g. wrong arg types)
 */
-Instruction *gen_additive_instr(Arg arg1, Arg arg2)
+Instruction *gen_additive_instr(Arg *arg1, Arg *arg2)
 {
     //TODO: implement this more fully
     return init_instruction(ADD, arg1, arg2);
@@ -115,7 +114,7 @@ Instruction *gen_additive_instr(Arg arg1, Arg arg2)
    Returns NULL if the operation is unsuccessful 
         (e.g. wrong arg types)
 */
-Instruction *gen_multiplicative_instr(Arg arg1, Arg arg2)
+Instruction *gen_multiplicative_instr(Arg *arg1, Arg *arg2)
 {
     //TODO: implement this more fully 
     return init_instruction(MULT, arg1, arg2);

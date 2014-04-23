@@ -1,6 +1,6 @@
 {
     int x = 5;
-    int y = q;
+    int y = x;
     int z = 5.5;
     char foo = "h";
 
