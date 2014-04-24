@@ -301,5 +301,5 @@ int main()
     yyparse();
  
     print_instr_list(instr_list, num_instrs);
-    compile(instr_list, symbol_table, num_instrs, "test.out");
+    compile(instr_list, symbol_table, num_instrs, "a.out");
 } 

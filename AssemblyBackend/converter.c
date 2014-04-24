@@ -4,11 +4,14 @@
 static const char *EBP_REGISTER = "ebp"; // Base (code) pointer reg
 static const char *ESP_REGISTER = "esp"; // Stack pointer reg
 
+//static const char *REGISTERS[] = { "eax", "ebx", "ecx", "edx", "esi", "edi" };
+
 // Instructions
 static const char *MOVE_INSTR = "mov";
 static const char *PUSH_INSTR = "push";
 static const char *SUB_INSTR = "sub";
 static const char *ADD_INSTR = "add";
+static const char *MULT_INSTR = "imul";
 
 // Sizes
 static const int CHAR_SIZE = 1;
@@ -49,30 +52,6 @@ int get_byte_size(eType type)
     return size;
 }
 
-char *get_assembly_type(eType type)
-{
-    char *repr = malloc(2 * sizeof(char));
-    
-    switch (type)
-    {
-        case INTEGER:
-            repr = "DD";
-            break;
-        case DOUBLE:
-            repr = "DD";
-            break;
-        /* TODO: Long
-        case LONG:
-            repr = "D";
-            break;
-        */
-        default:
-            break;
-    }
-    return repr;
-}
-
-
 void write_1instr(FILE *fp, const char *command, char *arg)
 {
     fprintf(fp, "\t%s %s\n", command, arg); 
@@ -82,12 +61,6 @@ void write_2instr(FILE *fp, const char *command,
                   char *arg1, char *arg2)
 {
     fprintf(fp, "\t%s %s, %s\n", command, arg1, arg2); 
-}
-
-void write_3instr(FILE *fp, const char *command, 
-                  char *result, char *arg1, char *arg2)
-{
-    fprintf(fp, "\t%s %s, %s, %s\n", command, result, arg1, arg2); 
 }
 
 /**
@@ -168,6 +141,7 @@ char *char_const(Constant *c)
     return repr;
 }
 
+
 /**
  *  Make room for local variables
  */
@@ -209,18 +183,27 @@ void init_data_section(GHashTable *symbol_table, FILE *fp)
     for (; idents!=NULL; idents = idents->next)
     {
         Identifier *id = (Identifier *) idents->data;
-        char *repr = get_assembly_type(id->type);
-        fprintf(fp, "\t%s\t%s\t0", id->symbol, repr);
+        //char *repr = get_assembly_type(id->type);
+        //fprintf(fp, "\t%s\t%s\t0", id->symbol, repr);
     }
 }
 
 
+// TODO: Better place to put these?
 void init_registers()
 {
     for (int i=0; i < NUM_REGISTERS; i++)
     {
         registers[i] = (Register) { .used=false, .memory_used=0 };
     }
+
+    // Manually give them reprs
+    registers[0].repr = "eax";
+    registers[1].repr = "ebx";
+    registers[2].repr = "ecx";
+    registers[3].repr = "edx";
+    registers[4].repr = "esi";
+    registers[5].repr = "edi";
 }
 
 char *repr_op_code(eOPCode op_code)
@@ -237,6 +220,9 @@ char *repr_op_code(eOPCode op_code)
         case SUB:
             repr = SUB_INSTR;
             break;
+        case MULT:
+            repr = MULT_INSTR;
+            break;
         default:
             repr = "NOT IMPLEMENTED";
             break;
@@ -249,9 +235,9 @@ char *repr_op_code(eOPCode op_code)
 // Do the postorder traversal
 void traverse_instructions(FILE *fp, Instruction *instr)
 {
-    Arg *cur_arg = instr->arg1;
-
+    bool first_arg_is_reg = false;
     char *arg_reprs[2];
+    Arg *cur_arg = instr->arg1;
     for (int i=0; i < 2; i++)
     {
         if (cur_arg == NULL)
@@ -267,21 +253,52 @@ void traverse_instructions(FILE *fp, Instruction *instr)
                 arg_reprs[i] = char_const(cur_arg->const_val);
                 break;
             case INSTR:            
-                // Recurse!
-                arg_reprs[i] = "poop";
+                // If this is the first argument and it's an instruction then we 
+                // know that it will result in an answer in the first register.
+                if (i == 0)
+                {
+                    first_arg_is_reg = true;
+                }
+
+                // Recurse! For now assume arg_reprs[0] result is in reg1 and
+                // arg_reprs[1] is in reg2
+                arg_reprs[i] = REGISTERS[i];
+                
+                // Now do the work to store the result in the correct register
+                traverse_instructions(fp, cur_arg->instr_val);
                 break;
             case IDENT:
-                // TODO: make this good
-                arg_reprs[i] = cur_arg->ident_val->symbol;
+                // Follow the pointer to get it from the stack
+                arg_reprs[i] = addr_ind(addr_add(ESP_REGISTER, cur_arg->ident_val->offset));
                 break;
             default:
-                printf("ERROR: Traverse Instructions, unknown type\n");
+                // Should never happen
+                assert(false);
                 break;
         }
         cur_arg = instr->arg2;
     }
 
     char *op_code = repr_op_code(instr->op_code);
+    // If the op_code is an assignment then we want to place the second arg
+    // into the first arg (Needs to be an ident.)
+    if (instr->op_code == ASSIGN)
+    {
+        // The issue is that normally things to evaluate into the second argument
+        // whereas here we know it will be in the first 
+        // The issue is that the second argument will evaluate into the second
+        // register. So let it know that !
+    }
+    // If not an assignment then we need the first arg to be a register.
+    // If this is not the case (either it's a constant or an ident) then we need
+    // to manually move it to the register. We've also grabbed any info from
+    // the registers we'll shift into so we can overwite them.
+    else if (!first_arg_is_reg)
+    {
+        write_2instr(fp, repr_op_code(ASSIGN), REGISTERS[0], arg_reprs[0]);
+        arg_reprs[0] = REGISTERS[0];
+    }
+
 
     // First arg should NEVER be null. Second arg could be (inefficient assign)
     assert(arg_reprs[0] != NULL);
@@ -310,7 +327,9 @@ void compile(GPtrArray *instr_list, GHashTable* symbol_table,
     //init_data_section(symbol_table, file);
     write_local_variables(file, symbol_table);
 
-    Instruction *cur_instr = get_instr(instr_list, num_instrs, 0);
+    // Need to deal with this...
+    Instruction *cur_instr = get_instr(instr_list, num_instrs, num_instrs - 1);
+    traverse_instructions(file, cur_instr);
 
     fclose(file);
 }

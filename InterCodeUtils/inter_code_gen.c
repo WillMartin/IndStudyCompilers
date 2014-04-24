@@ -76,7 +76,7 @@ void print_instr_list(GPtrArray *instr_list, int num_instrs)
     for (int i=0; i < num_instrs; i++)
     {
         instr = (Instruction*) g_ptr_array_index(instr_list, i);
-        printf("%d:%s:%s\n", instr->op_code, 
+        printf("%s:%s:%s\n", OP_CODE_REPRS[instr->op_code], 
                 get_arg_repr(instr->arg1),get_arg_repr(instr->arg2));
     }
 }

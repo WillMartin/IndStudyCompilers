@@ -23,6 +23,9 @@ typedef enum eOPCode
     UMINUS, // unary minus sign
 } eOPCode;
 
+// For debugging only
+static const char* OP_CODE_REPRS[] = {"=", "+", "CAST", "/", "*", "-", "-(UNARY)"};
+
 typedef struct Constant
 {
     eType type;
