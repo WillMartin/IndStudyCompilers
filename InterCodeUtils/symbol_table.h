@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
+
+static int temp_number = 0;
 
 // Added the list for allowing for nested tables.
 typedef struct SymbolTableList
@@ -22,12 +25,11 @@ typedef enum eType
     LONG,
 } eType;
 
-// Where the data is allocated
-typedef enum eAllocLocation
+typedef enum eAddressType
 {
-    STATIC,
-    STACK,
-} eAllocLocation;
+    REGISTER_TYPE,
+    IDENTIFIER_TYPE,
+} eAddressType;
 
 // Entry in symbol table has symbol lexeme, type info
 typedef struct Identifier
@@ -35,14 +37,17 @@ typedef struct Identifier
     char *symbol;
     eType type;
 
-    eAllocLocation location; 
     int offset; // Offset from start of location
-} Identifier;
+    GList *address_descriptor; // Of type Address
+} Identifier; 
 
 GHashTable *init_symbol_table();
 Identifier *get_identifier(GHashTable *sym_table, char* key);
 Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type);
+Identifier *get_temp_symbol();
 void put_identifier(GHashTable *sym_table, Identifier *id);
+
+void print_symbol_table(GHashTable *sym_table);
 
 // Hack together
 GList *get_all_identifiers(GHashTable *sym_table);

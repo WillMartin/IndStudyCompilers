@@ -27,7 +27,29 @@ Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type)
     return id;
 }
 
+Identifier *get_temp_symbol()
+{
+    Identifier *id = malloc(sizeof(Identifier));
+    char *sym = malloc(4 * sizeof(char));
+    sprintf(sym, "t%d", temp_number);
+    id->symbol = sym;
+
+    temp_number += 1;
+    return id;
+}
+
 GList *get_all_identifiers(GHashTable *sym_table)
 {
     return g_hash_table_get_values(sym_table);
+}
+
+void print_symbol_table(GHashTable *sym_table)
+{
+    GList *ids = get_all_identifiers(sym_table);
+
+    for (; ids!=NULL; ids=ids->next)
+    {
+        Identifier *id = ids->data;
+        printf("<sym:%s>\n", id->symbol);
+    }
 }

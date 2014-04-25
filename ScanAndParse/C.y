@@ -81,7 +81,7 @@ additive_expression:
               multiplicative_expression
             | additive_expression '+' multiplicative_expression
               {
-                  Instruction *instr = gen_additive_instr($1, $3);
+                  Instruction *instr = gen_additive_instr(symbol_table, $1, $3);
 
                   if (add_instr == NULL) 
                   { 
@@ -92,9 +92,16 @@ additive_expression:
                       add_instr(instr_list, &num_instrs, instr);
                   }
 
+                    
                   Arg *arg = malloc(sizeof(Arg));
+                  // Point instead to where the instr's result will be (it's temp symbol)
+                  arg->type = IDENT;
+                  arg->ident_val = instr->result;
+
+                  /* I think this i bad.
                   arg->type = INSTR;
                   arg->instr_val=instr;
+                  */
                   $$ = arg;
               }
             ;
@@ -103,7 +110,7 @@ multiplicative_expression:
               primary_expression
             | multiplicative_expression '*' primary_expression
               {
-                  Instruction *mult_instr = gen_multiplicative_instr($1, $3);
+                  Instruction *mult_instr = gen_multiplicative_instr(symbol_table, $1, $3);
 
                   if (mult_instr == NULL) 
                   { 
@@ -115,8 +122,14 @@ multiplicative_expression:
                   }
 
                   Arg *arg = malloc(sizeof(Arg));
+                  // Point instead to where the instr's result will be (it's temp symbol)
+                  arg->type = IDENT;
+                  arg->ident_val = mult_instr->result;
+
+                  /* I think this i bad.
                   arg->type = INSTR;
                   arg->instr_val = mult_instr;
+                  */
                   $$ = arg;
               }
             ;
@@ -128,7 +141,6 @@ primary_expression:
                   arg->type = IDENT;
                   arg->ident_val = $1;
                   $$ = arg;
-
               }
             | literal
             | '(' expression ')'
@@ -141,16 +153,16 @@ assignment_expression:
               /* TODO: id should be unary-expression */
             | id ASSIGN_OP expression 
               {
-                  Arg *arg1 = malloc(sizeof(Arg));
-                  arg1->type = IDENT;
-                  arg1->ident_val = $1;
-
-                  Instruction *instr = init_instruction(ASSIGN, arg1, $3);
+                  Instruction *instr = init_instruction(ASSIGN, $3, NULL, $1);
                   add_instr(instr_list, &num_instrs, instr);
 
                   Arg *ret_arg = malloc(sizeof(Arg));
+                  ret_arg->type = IDENT;
+                  ret_arg->ident_val = instr->result;
+                  /*
                   ret_arg->type = INSTR;
                   ret_arg->instr_val = instr;
+                  */
                   $$ = ret_arg;
               }
             ;
@@ -171,41 +183,23 @@ declaration:
                   id->type = $1;
                   id->symbol = $2;
                   // For now allocate everything to the stack
-                  id->location = STACK;
                   id->offset = stack_offset;
                   stack_offset += get_byte_size($1);
 
                   put_identifier(symbol_table, id);
 
-                  Arg *id_arg = malloc(sizeof(Arg));
-                  id_arg->type = IDENT;
-                  id_arg->ident_val = id;
-
-                  Instruction *instr = init_instruction(ASSIGN, id_arg, $4);
+                  Instruction *instr = init_instruction(ASSIGN, $4, NULL, id);
                   add_instr(instr_list, &num_instrs, instr);
 
-
                   $$ = malloc(sizeof(Arg));
+                  $$->type = IDENT;
+                  $$->ident_val = instr->result;
+                  /*
                   $$->type = INSTR;
                   $$->instr_val = instr;
+                  */
               }
               ;
-
- /* Declarator for now can just be ID, should be more 
-
-    Moved to declaration for simplicitry. Can only initialize as int x = 5;
-init_declaration_list:
-              id
-              {
-
-              }
-            |
-              id ASSIGN_OP initializer
-              {
-
-              }
-            ;
-            */
 
 /* For now, just allow initialization to a primary expression */
 initializer:
@@ -301,5 +295,6 @@ int main()
     yyparse();
  
     print_instr_list(instr_list, num_instrs);
-    compile(instr_list, symbol_table, num_instrs, "a.out");
+    print_symbol_table(symbol_table);
+    compile(instr_list, symbol_table, num_instrs, "inter.asm");
 } 

@@ -8,22 +8,19 @@
 
 typedef struct Register
 {
-    bool used;
-    int memory_used;
     char *repr;
+    GList *variables_held; // For identifiers held in registers
 } Register;
 
-// Don't change the order! They correspond to the REGISTERS
-// array for to_strings
-typedef enum eRegister
-{
-    EAX,
-    EBX,
-    ECX,
-    EDX,
-    ESI,
-    EDI,
-} eRegister;
+typedef struct Address
+{   
+    eAddressType type; 
+    union
+    {
+        Register *reg_addr_val;
+        struct Identifier *ident_addr_val;
+    };
+} Address;
 
 void compile(GPtrArray *instr_list, GHashTable *symbol_table,
              int num_instrs, char *out_file);

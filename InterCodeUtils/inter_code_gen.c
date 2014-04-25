@@ -51,20 +51,27 @@ char *get_constant_repr(Constant *c)
 char *get_arg_repr(Arg *arg)
 {
     char *repr = NULL;
-    switch (arg->type)
+    if (arg == NULL)
     {
-        case CONST:
-            repr = get_constant_repr(arg->const_val);
-            break;
-        case INSTR:
-            repr = "INSTR";
-            break;
-        case IDENT:
-            repr = arg->ident_val->symbol;
-            break;
-        default:
-            sprintf(repr, "UNKNOWN: %d", arg->type);
-            break;
+        repr = "NULL_ARG";
+    }
+    else
+    {
+        switch (arg->type)
+        {
+            case CONST:
+                repr = get_constant_repr(arg->const_val);
+                break;
+            case INSTR:
+                repr = "INSTR";
+                break;
+            case IDENT:
+                repr = arg->ident_val->symbol;
+                break;
+            default:
+                sprintf(repr, "UNKNOWN: %d", arg->type);
+                break;
+        }
     }
     return repr;
 }
@@ -81,42 +88,59 @@ void print_instr_list(GPtrArray *instr_list, int num_instrs)
     }
 }
 
-Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2)
+Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2,
+                              Identifier *result)
 {
     Instruction *instr = malloc(sizeof(Instruction));
     instr->op_code = op_code;
     instr->arg1 = arg1;
     instr->arg2 = arg2;
+    instr->result = result;
     return instr;
 }
 
 /* Returns instruction set to perform cast
    Returns NULL if the operation is unsuccessful 
         (e.g. wrong arg types)
-*/
 Instruction *gen_cast_instr(Arg *arg, eOPCode desired_type)
 {
     //TODO: implement this ... at all
     return init_instruction(CAST, arg, NULL);
 }
+*/
 
 /* Returns instruction set to perform multiplication 
    Returns NULL if the operation is unsuccessful 
         (e.g. wrong arg types)
 */
-Instruction *gen_additive_instr(Arg *arg1, Arg *arg2)
+Instruction *gen_additive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2)
 {
     //TODO: implement this more fully
-    return init_instruction(ADD, arg1, arg2);
+    Identifier *temp = get_temp_symbol();
+    // For now we're just saying everything can be an int
+    temp->type = INTEGER;
+    //TODO: change this..
+    temp->offset = 300;
+
+    put_identifier(sym_table, temp);
+    return init_instruction(ADD, arg1, arg2, temp);
 }
 
 /* Returns instruction set to perform multiplication 
    Returns NULL if the operation is unsuccessful 
         (e.g. wrong arg types)
 */
-Instruction *gen_multiplicative_instr(Arg *arg1, Arg *arg2)
+Instruction *gen_multiplicative_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2)
 {
+    //TODO: implement this more fully
+    Identifier *temp = get_temp_symbol();
+    // For now we're just saying everything can be an int
+    temp->type = INTEGER;
+    //TODO: change this..
+    temp->offset = 300;
+
+    put_identifier(sym_table, temp);
     //TODO: implement this more fully 
-    return init_instruction(MULT, arg1, arg2);
+    return init_instruction(MULT, arg1, arg2, temp);
 }
 
