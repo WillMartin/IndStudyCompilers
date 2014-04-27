@@ -4,3 +4,4 @@ compileout
 lex.yy.c
 y.tab.c
 y.tab.h
+*.asm

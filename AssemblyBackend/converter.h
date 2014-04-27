@@ -8,7 +8,7 @@
 
 typedef struct Register
 {
-    char *repr;
+    const char *repr;
     GList *variables_held; // For identifiers held in registers
 } Register;
 

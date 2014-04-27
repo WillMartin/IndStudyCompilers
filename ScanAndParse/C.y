@@ -156,14 +156,13 @@ assignment_expression:
                   Instruction *instr = init_instruction(ASSIGN, $3, NULL, $1);
                   add_instr(instr_list, &num_instrs, instr);
 
+                  /* nothing can take this, so don't create a new arg here.
                   Arg *ret_arg = malloc(sizeof(Arg));
                   ret_arg->type = IDENT;
                   ret_arg->ident_val = instr->result;
-                  /*
-                  ret_arg->type = INSTR;
-                  ret_arg->instr_val = instr;
-                  */
                   $$ = ret_arg;
+                  */
+                  $$ = NULL;
               }
             ;
 
@@ -191,13 +190,13 @@ declaration:
                   Instruction *instr = init_instruction(ASSIGN, $4, NULL, id);
                   add_instr(instr_list, &num_instrs, instr);
 
+                    
+                  /* // For now don't return anything because nothing operates on this further up
                   $$ = malloc(sizeof(Arg));
                   $$->type = IDENT;
                   $$->ident_val = instr->result;
-                  /*
-                  $$->type = INSTR;
-                  $$->instr_val = instr;
                   */
+                  $$ = NULL;
               }
               ;
 

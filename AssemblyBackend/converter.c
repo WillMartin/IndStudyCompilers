@@ -30,6 +30,15 @@ int STACK_ADDR;
 int CODE_ADDR;
 
 
+// Make a copy of the register name so that we can
+// free it like everything else 
+char *repr_reg(const char *reg)
+{
+    // All only 3 chars long
+    char *repr = malloc(4 * sizeof(char));
+    sprintf(repr, "%s", reg);
+    return repr;
+}
 int get_byte_size(eType type)
 {
     int size;
@@ -60,8 +69,8 @@ void write_1instr(FILE *fp, const char *command, char *arg)
     fprintf(fp, "\t%s %s\n", command, arg); 
 }
 
-void write_2instr_with_option(FILE *fp, const char *command, char*option,
-                            char *arg1, char *arg2)
+void write_2instr_with_option(FILE *fp, const char *command, const char *option,
+                              char *arg1, char *arg2)
 {
 
 
@@ -74,14 +83,14 @@ void write_2instr(FILE *fp, const char *command,
     write_2instr_with_option(fp, command, "", arg1, arg2);
 }
 
-char *addr_ind(const char *reg)
+char *addr_ind(char *reg)
 {
-    char *repr = malloc(sizeof(strlen(reg) + 3));
+    char *repr = malloc((strlen(reg) + 3) * sizeof(char));
     sprintf(repr, "[%s]", reg);
     return repr;
 }
 
-char *addr_mult(const char *reg, int fact)
+char *addr_mult(char *reg, int fact)
 {
     // Assuming fact are less than 1,000 in this case
     char *repr = malloc(sizeof(strlen(reg)) + 5);
@@ -89,7 +98,7 @@ char *addr_mult(const char *reg, int fact)
     return repr;
 }
 
-char *addr_add(const char *reg, int offset)
+char *addr_add(char *reg, int offset)
 {
     // Assuming offsets are less than 1,000 in this case
     char *repr = malloc(sizeof(strlen(reg)) + 5);
@@ -151,29 +160,26 @@ void init_stack_variables(FILE *fp, GHashTable *address_table)
 {
     //TODO: change this to local identifiers eventually
     GList *local_ids = get_all_identifiers(address_table);
+    GList *head = local_ids;
 
     // Just push uninitialized space onto the stack
     int offset = 0;
     int data_size = 0;
     Identifier *cur_id;
+    char *esp_repr = repr_reg(registers[0]->repr);
     for (; local_ids != NULL; local_ids = local_ids->next)
     {
         cur_id = (Identifier *) local_ids->data;
         data_size = get_byte_size(cur_id->type);
 
         // Doesn't matter what we push on.
-        write_1instr(fp, PUSH_INSTR, registers[0]->repr);
+        write_1instr(fp, PUSH_INSTR, esp_repr);
         offset += data_size;
         cur_id->offset = offset;
     }
-
-    /* PUSH adjusts the stack pointer correctly
-    if (offset > 0)
-    {
-        char *char_offset = char_int(offset);
-        write_2instr(fp, SUB_INSTR, ESP_REGISTER, char_offset);
-    }
-    */
+    free(esp_repr);
+    // Now free the list structure itself (not FULL as we still want the Identifiers)
+    g_list_free(head);
 }
 
 // TODO: Better place to put these?
@@ -195,30 +201,33 @@ void init_registers()
     registers[5]->repr = "edi";
 }
 
-char *repr_op_code(eOPCode op_code)
+
+const char *repr_op_code(eOPCode op_code)
 {
-    char *repr;
+    const char *const_repr;
     switch (op_code)
     {
         case ASSIGN:
-            repr = MOVE_INSTR;
+            const_repr = MOVE_INSTR;
             break;
         case ADD:
-            repr = ADD_INSTR;
+            const_repr = ADD_INSTR;
             break;
         case SUB:
-            repr = SUB_INSTR;
+            const_repr = SUB_INSTR;
             break;
         case MULT:
-            repr = MULT_INSTR;
+            const_repr = MULT_INSTR;
             break;
         default:
-            repr = "NOT IMPLEMENTED";
+            const_repr = "NOT IMPLEMENTED";
             break;
     }
-    return repr;
+    return const_repr;
 }
 
+
+/*
 // Recursively descend instruction list
 // Set pointers to NULL once they've been written
 // Do the postorder traversal
@@ -301,6 +310,7 @@ void traverse_instructions(FILE *fp, Instruction *instr)
         write_2instr(fp, op_code, arg_reprs[0], arg_reprs[1]);
     }
 }
+*/
 
 char *get_assem_arg_repr(Arg *arg)
 {
@@ -313,9 +323,12 @@ char *get_assem_arg_repr(Arg *arg)
             repr = char_const(arg->const_val);
             break;
         case IDENT:
+            ; // Empty statement because assignment can't be first thing in switch
             // Just get it's address for now, if they want what's 
             // in it the caller can indirect it
-            repr = addr_add(ESP_REGISTER, arg->ident_val->offset);
+            char *esp_repr = repr_reg(ESP_REGISTER);
+            repr = addr_add(esp_repr, arg->ident_val->offset);
+            free(esp_repr);
             break;
         default:
             // Should never happen
@@ -337,7 +350,16 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
         {
             // Simple, just dump the first argument into the stack location 
             // of the result
-            char *result_loc = addr_ind(addr_add(ESP_REGISTER, instr->result->offset)); 
+
+            // Need to be careful with string functions so we can clean it all back up
+            char *esp_repr = repr_reg(ESP_REGISTER);
+            char *added_repr= addr_add(esp_repr, instr->result->offset);
+            char *result_loc = addr_ind(added_repr);
+            // Take care of intermediate strings
+            free(esp_repr);
+            free(added_repr);
+
+
             char *arg_repr;
             bool requires_option = false;
             // In an assignment only the first argument is populated
@@ -348,19 +370,28 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
                     arg_repr = char_const(instr->arg1->const_val);
                     requires_option = true;
                     break;
-                case IDENT:
+                case IDENT:;
                     // Note: Move operations cannot be mem->mem
                     // Get addr of its ptr.
-                    arg_repr = addr_ind(addr_add(ESP_REGISTER, instr->arg1->ident_val->offset)); 
+                    char *esp_repr = repr_reg(ESP_REGISTER);
+                    char *added_repr= addr_add(esp_repr, instr->arg1->ident_val->offset);
+                    arg_repr = addr_ind(added_repr);
+                    free(esp_repr);
+                    free(added_repr);
+
+                    char *intermed_reg_repr = repr_reg(registers[0]->repr);
                     // Then load it
-                    write_2instr(fp, MOVE_INSTR, registers[0]->repr, arg_repr);
+                    write_2instr(fp, MOVE_INSTR, intermed_reg_repr, arg_repr);
+                    free(arg_repr);
                     // Now pt the repr to the newly loaded instr
-                    arg_repr = registers[0]->repr;
+                    arg_repr = intermed_reg_repr;
                     break;
                 // I think this should never happen (includes INSTR)
                 default:
                     assert(false);
+                    break;
             }
+
             // If the second argument is a constant then we need an option
             if (requires_option)
             {
@@ -370,6 +401,9 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
             {
                 write_2instr(fp, MOVE_INSTR, result_loc, arg_repr);
             }
+            // Free the strings we've been manipulating
+            free(arg_repr);
+            free(result_loc);
         } 
         // Non-assign instructions require more work.
         else
@@ -377,18 +411,37 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
             // Get the first instr and load it into register 0
             char *arg_repr = get_assem_arg_repr(instr->arg1);
             // Because we're doing a move we want whatever is in the memory slot (not the address itself)
-            if (instr->arg1->type == IDENT) { arg_repr = addr_ind(arg_repr); }
-            write_2instr(fp, MOVE_INSTR, registers[0]->repr, arg_repr);
-
+            if (instr->arg1->type == IDENT) 
+            { 
+                char *direct_repr = arg_repr;
+                arg_repr = addr_ind(arg_repr); 
+                free(direct_repr);
+            }
+            // Save once since we use it 3 times in this block
+            char *esp_repr = repr_reg(registers[0]->repr);
+            write_2instr(fp, MOVE_INSTR, esp_repr, arg_repr);
+            free(arg_repr);
+    
             // Now get the second arguments repr and do the operation
             arg_repr = get_assem_arg_repr(instr->arg2);
-            if (instr->arg2->type == IDENT) { arg_repr = addr_ind(arg_repr); }
-            write_2instr(fp, repr_op_code(instr->op_code), registers[0]->repr, arg_repr);
+            if (instr->arg2->type == IDENT)
+            {
+                char *direct_repr = arg_repr;
+                arg_repr = addr_ind(arg_repr); 
+                free(direct_repr);
+            }
+
+            write_2instr(fp, repr_op_code(instr->op_code), esp_repr, arg_repr);
+            free(arg_repr);
  
             // The final step is calculating where to store the result
-            char *result_loc = addr_ind(addr_add(ESP_REGISTER, instr->result->offset)); 
+            char *add_repr = addr_add(esp_repr, instr->result->offset);
+            char *result_loc = addr_ind(add_repr); 
             // Again just using register 0 for now
-            write_2instr(fp, MOVE_INSTR, result_loc, registers[0]->repr);
+            write_2instr(fp, MOVE_INSTR, result_loc, esp_repr);
+            free(add_repr);
+            free(result_loc);
+            free(esp_repr);
         }
     }
 }

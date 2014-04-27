@@ -48,12 +48,15 @@ char *get_constant_repr(Constant *c)
     return repr;
 }
 
+// Return value needs to be freed by caller 
+// (all will be malloc'd for this reason)
 char *get_arg_repr(Arg *arg)
 {
-    char *repr = NULL;
+    char *repr;
     if (arg == NULL)
     {
-        repr = "NULL_ARG";
+        repr = malloc(9 * sizeof(char));
+        sprintf(repr, "NULL_ARG");
     }
     else
     {
@@ -63,12 +66,16 @@ char *get_arg_repr(Arg *arg)
                 repr = get_constant_repr(arg->const_val);
                 break;
             case INSTR:
-                repr = "INSTR";
+                repr = malloc(6 * sizeof(char));
+                sprintf(repr, "INSTR");
                 break;
-            case IDENT:
-                repr = arg->ident_val->symbol;
+            case IDENT:;
+                char *sym = arg->ident_val->symbol;
+                repr = malloc((strlen(sym) + 1) * sizeof(char));
+                sprintf(repr, "%s", sym);
                 break;
             default:
+                repr = malloc(15 * sizeof(char));
                 sprintf(repr, "UNKNOWN: %d", arg->type);
                 break;
         }
@@ -79,12 +86,17 @@ char *get_arg_repr(Arg *arg)
 void print_instr_list(GPtrArray *instr_list, int num_instrs)
 {
     Instruction *instr;
-
+    char *arg1_repr;
+    char *arg2_repr;
     for (int i=0; i < num_instrs; i++)
     {
         instr = (Instruction*) g_ptr_array_index(instr_list, i);
+        arg1_repr = get_arg_repr(instr->arg1);
+        arg2_repr = get_arg_repr(instr->arg2);
         printf("%s:%s:%s\n", OP_CODE_REPRS[instr->op_code], 
-                get_arg_repr(instr->arg1),get_arg_repr(instr->arg2));
+                arg1_repr, arg2_repr);
+        free(arg1_repr);
+        free(arg2_repr);
     }
 }
 

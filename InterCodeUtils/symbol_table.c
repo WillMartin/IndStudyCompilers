@@ -46,10 +46,13 @@ GList *get_all_identifiers(GHashTable *sym_table)
 void print_symbol_table(GHashTable *sym_table)
 {
     GList *ids = get_all_identifiers(sym_table);
+    // For freeing
+    GList *head = ids;
 
     for (; ids!=NULL; ids=ids->next)
     {
         Identifier *id = ids->data;
         printf("<sym:%s>\n", id->symbol);
     }
+    g_list_free(head);
 }
