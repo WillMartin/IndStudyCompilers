@@ -4,8 +4,6 @@
 static const char *EBP_REGISTER = "ebp"; // Base (code) pointer reg
 static const char *ESP_REGISTER = "esp"; // Stack pointer reg
 
-//static const char *REGISTERS[] = { "eax", "ebx", "ecx", "edx", "esi", "edi" };
-
 // Instructions
 static const char *MOVE_INSTR = "mov";
 static const char *PUSH_INSTR = "push";
@@ -125,7 +123,7 @@ char *char_double(double x)
     return repr;
 }
 
-char *char_const(Constant *c)
+char *repr_const(Constant *c)
 {
     char *repr;
 
@@ -226,91 +224,277 @@ const char *repr_op_code(eOPCode op_code)
     return const_repr;
 }
 
-
-/*
-// Recursively descend instruction list
-// Set pointers to NULL once they've been written
-// Do the postorder traversal
-void traverse_instructions(FILE *fp, Instruction *instr)
+void dump_reg(FILE *fp, Register *reg)
 {
-    bool first_arg_is_reg = false;
-    char *arg_reprs[2];
-    Arg *cur_arg = instr->arg1;
-    for (int i=0; i < 2; i++)
+    GList *cur_list = reg->variables_held;
+    Identifier *cur_id;
+    for (; cur_list!=NULL; cur_list=cur_list->next)
     {
-        if (cur_arg == NULL)
-        {
-            printf("WARNING: Argument empty\n");
-            arg_reprs[i] = NULL;
-            continue;
-        }
+        cur_id = cur_list->data;
+        // Find out where to store it
+        char *esp_repr = repr_reg(ESP_REGISTER);
+        char *added_repr= addr_add(esp_repr, cur_id->offset);
+        char *result_loc = addr_ind(added_repr);
+        char *rrepr = repr_reg(reg->repr);
+        write_2instr(fp, MOVE_INSTR, result_loc, rrepr);
 
-        switch (cur_arg->type)
+        free(esp_repr);
+        free(added_repr);
+        free(result_loc);
+        free(rrepr);
+
+        // Now remove this register from it's list.
+        GList *addr_list = cur_id->address_descriptor;
+        Address *cur_addr;
+        for (; addr_list!=NULL; addr_list=addr_list->next)
         {
-            case CONST:
-                arg_reprs[i] = char_const(cur_arg->const_val);
+            cur_addr = (Address*) addr_list->data;
+            if (cur_addr->type == REGISTER_TYPE &&
+                cur_addr->reg_addr_val == reg)
+            {
+                cur_id->address_descriptor = g_list_delete_link(cur_id->address_descriptor, addr_list);
                 break;
-            case INSTR:            
-                // If this is the first argument and it's an instruction then we 
-                // know that it will result in an answer in the first register.
-                if (i == 0)
+            }
+        }
+        assert(false);
+    }
+    g_list_free(reg->variables_held);
+    reg->variables_held = NULL;
+}
+
+
+// For ids being used as arguments in operations
+// From pg. 547 - Not the most efficient but hopefully readable
+// We need all three args in order to choose the correct register
+// reserved registers cannot be used for this argument
+Register *get_reg_for_arg(FILE *fp, Identifier *arg_id, Identifier *result_id, 
+                          Identifier *other_id, bool *reserved)
+{
+    // If arg_id is is already in a register, pick it
+    GList *addrs = arg_id->address_descriptor;
+    Address *cur_addr; 
+    for(; addrs != NULL; addrs = addrs->next)
+    {
+        cur_addr = (Address*) addrs->data;
+        if (cur_addr->type == REGISTER_TYPE)
+        {
+            return cur_addr->reg_addr_val;
+        }
+    }
+
+    // Check to see if there's an empty register
+    for (int i=0; i<NUM_REGISTERS; i++)
+    {
+        if (registers[i]->variables_held == NULL)
+        {
+            return registers[i];
+        }
+    }
+
+    
+    // id isn't currently in a register and there are no empty registers
+    // Find out what values we need to store to open one up
+
+    // will determine which register to dump
+    int register_scores[NUM_REGISTERS] = {0};
+
+
+    // Determine a score for each register based on the number of stores
+    // we'll have to do
+    for (int i=0; i<NUM_REGISTERS; i++)
+    {
+        // Don't bother doing all the extra work if the register is reserved
+        if (!reserved[i])
+        {
+            GList *cur_list = registers[i]->variables_held;
+            Identifier *cur_id;
+            for (; cur_list!=NULL; cur_list=cur_list->next)
+            {
+                cur_id = cur_list->data;
+                
+                // If we are overwriting cur_id (e.g. cur_id = a + b)
+                // then don't increment score, unless we do (cur_id = cur_id + b)
+                if (cur_id == result_id && cur_id != other_id)
                 {
-                    first_arg_is_reg = true;
+                    continue;
                 }
 
-                // Recurse! For now assume arg_reprs[0] result is in reg1 and
-                // arg_reprs[1] is in reg2
-                arg_reprs[i] = registers[i]->repr;
-                
-                // Now do the work to store the result in the correct register
-                traverse_instructions(fp, cur_arg->instr_val);
-                break;
-            case IDENT:
-                // Follow the pointer to get it from the stack
-                arg_reprs[i] = addr_ind(addr_add(ESP_REGISTER, cur_arg->ident_val->offset));
-                break;
-            default:
-                // Should never happen
-                assert(false);
-                break;
+                // If 1, only stored here. Have to store it.
+                if (g_list_length(cur_id->address_descriptor) == 1)
+                {
+                    register_scores[i]++;
+                }
+
+                // DIDN'T IMPLEMENT FROM BOOK: If cur_id is no longer used in future
+                // instructions we can ignore it
+            }
         }
-        cur_arg = instr->arg2;
     }
 
-    char *op_code = repr_op_code(instr->op_code);
-    // If the op_code is an assignment then we want to place the second arg
-    // into the first arg (Needs to be an ident.)
-    if (instr->op_code == ASSIGN)
+    int min_score = 9999999;
+    Register *best_reg = NULL;
+    // Grab the lowest scores and register
+    for (int i=0; i<NUM_REGISTERS; i++)
     {
-        // The issue is that normally things to evaluate into the second argument
-        // whereas here we know it will be in the first 
-        // The issue is that the second argument will evaluate into the second
-        // register. So let it know that !
-    }
-    // If not an assignment then we need the first arg to be a register.
-    // If this is not the case (either it's a constant or an ident) then we need
-    // to manually move it to the register. We've also grabbed any info from
-    // the registers we'll shift into so we can overwite them.
-    else if (!first_arg_is_reg)
-    {
-        write_2instr(fp, repr_op_code(ASSIGN), registers[0]->repr, arg_reprs[0]);
-        arg_reprs[0] = registers[0]->repr;
+        if (!reserved[i] &&
+            register_scores[i] < min_score)
+        {
+            min_score = register_scores[i];
+            best_reg = registers[i];
+        }
     }
 
+    // Now we need to dump this register to memory
+    dump_reg(fp, best_reg);
+    return best_reg;
+}
 
-    // First arg should NEVER be null. Second arg could be (inefficient assign)
-    assert(arg_reprs[0] != NULL);
-
-    if (arg_reprs[1] == NULL)
+int get_index_for_reg(Register *reg)
+{
+    for (int i=0; i<NUM_REGISTERS; i++)
     {
-        write_1instr(fp, op_code, arg_reprs[0]);
+        if (reg == registers[i])
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Assuming for now that everything passed here will be ids
+void *get_regs(FILE *fp, Instruction *instr, Register **res_reg, 
+               Register **arg1_reg, Register **arg2_reg)
+{
+    bool reserved_regs[6] = {0};
+    // Figure out which variables are needed
+    // For now arg2 should ALWAYS be null
+    // But in the future that might not be true
+    if (instr->op_code == ASSIGN && instr->arg2 == NULL)
+    {
+        // Use book algorithm
+        if (instr->arg1->type == IDENT)
+        {
+            // This is easy since we can just use the first args register
+            Register *arg_reg = get_reg_for_arg(fp, instr->arg1->ident_val, instr->result, 
+                                                NULL, reserved_regs);
+            *arg1_reg = arg_reg;
+            *res_reg = arg_reg;
+        }
+        // Even if we just assign a constant we need to find a register for the result
+        else
+        {
+            //TODO: additional rules for this probably
+            *res_reg = get_reg_for_arg(fp, instr->result, NULL, NULL, reserved_regs);
+        }
     }
     else
     {
-        write_2instr(fp, op_code, arg_reprs[0], arg_reprs[1]);
+        // Only want to get registers for non-constants
+        if (instr->arg1->type == IDENT)
+        {
+            // In this case we need to find registers for all of the them
+            *arg1_reg = get_reg_for_arg(fp, instr->arg1->ident_val, 
+                              instr->result, instr->arg2->ident_val, reserved_regs);
+
+            reserved_regs[get_index_for_reg(*arg1_reg)] = true;
+        }
+
+        if (instr->arg2->type == IDENT)
+        {
+            *arg2_reg = get_reg_for_arg(fp, instr->arg2->ident_val, 
+                              instr->result, instr->arg1->ident_val, reserved_regs);
+
+            reserved_regs[get_index_for_reg(*arg2_reg)] = true;
+        }
+ 
+        //TODO: there are extra rules for this (pg. 548)
+        *res_reg = get_reg_for_arg(fp, instr->result, NULL, NULL, reserved_regs);
+
     }
 }
-*/
+
+// Just get it's address for now, if they want what's 
+// in it the caller can indirect it
+char *repr_ident(Identifier *ident)
+{
+    char *esp_repr = repr_reg(ESP_REGISTER);
+    char *repr = addr_add(esp_repr, ident->offset);
+    free(esp_repr);
+    return repr;
+}
+
+// TODO:Need to get a better name for this
+// load_reg must either have the arg in it or it must be empty!
+char *basic_handle_arg(Arg *arg, Register *load_reg, FILE *fp)
+{
+    char *repr;
+    if (arg->type == IDENT)
+    {
+        // Check to see if it's already loaded
+        bool loaded = false;
+        GList *arg_addrs = arg->ident_val->address_descriptor;
+        for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
+        {
+            if (arg_addrs->data == load_reg)
+            {
+                loaded = true;
+                break;
+            }
+        }
+        
+        // If it isn't then we need to issue a load command
+        // guarenteed that it's already clear if we get it here
+        if (!loaded)
+        {
+            char *load_from_direct = repr_ident(arg->ident_val);            
+            // Want the value, not the address
+            char *load_from = addr_ind(load_from_direct);
+            char *load_to = repr_reg(load_reg->repr);
+
+            write_2instr(fp, MOVE_INSTR, load_to, load_from);
+            free(load_from_direct);
+            free(load_from);
+            free(load_to);
+        }
+
+    }
+    else if (arg->type == CONST)
+    {
+        repr = repr_const(arg->const_val);
+    }
+    else { assert(false); }
+    return repr;
+}
+
+
+
+void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
+                   int num_instrs, FILE *fp)
+{   
+    for (int i=0; i<num_instrs; i++)
+    {
+        Instruction *cur_instr = get_instr(instr_list, num_instrs, i);
+        Register *result_reg, *arg1_reg, *arg2_reg;
+        get_regs(fp, cur_instr, &result_reg, &arg1_reg, &arg2_reg);
+
+        char *result_repr, *arg1_repr, *arg2_repr;
+
+        // Definitely going to be a register
+        result_repr = repr_reg(result_reg->repr);
+        arg1_repr = basic_handle_arg(cur_instr->arg1, arg1_reg, fp); 
+        arg2_repr = basic_handle_arg(cur_instr->arg2, arg2_reg, fp); 
+
+        if (cur_instr->arg2 != NULL && cur_instr->arg2->type == CONST)
+        {
+            write_2instr_with_option(fp, MOVE_INSTR, DWORD_OPTION, result_loc, arg_repr);
+        }
+        else
+        {
+            write_2instr(fp, MOVE_INSTR, result_loc, arg_repr);
+        }
+
+    }
+}
 
 char *get_assem_arg_repr(Arg *arg)
 {
@@ -320,15 +504,10 @@ char *get_assem_arg_repr(Arg *arg)
     switch (arg->type)
     {
         case CONST:
-            repr = char_const(arg->const_val);
+            repr = repr_const(arg->const_val);
             break;
         case IDENT:
-            ; // Empty statement because assignment can't be first thing in switch
-            // Just get it's address for now, if they want what's 
-            // in it the caller can indirect it
-            char *esp_repr = repr_reg(ESP_REGISTER);
-            repr = addr_add(esp_repr, arg->ident_val->offset);
-            free(esp_repr);
+            repr = repr_ident(arg->ident_val);
             break;
         default:
             // Should never happen
@@ -337,6 +516,8 @@ char *get_assem_arg_repr(Arg *arg)
     }
     return repr;
 }
+
+
 
 /* Naive way of compiling. Everything is loaded, operated on, then retured to 
     its proper stack location */
@@ -367,7 +548,7 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
             {
                 case CONST:
                     // Nice and easy, just get its string repr
-                    arg_repr = char_const(instr->arg1->const_val);
+                    arg_repr = repr_const(instr->arg1->const_val);
                     requires_option = true;
                     break;
                 case IDENT:;

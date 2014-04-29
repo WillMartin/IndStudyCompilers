@@ -25,12 +25,6 @@ typedef enum eType
     LONG,
 } eType;
 
-typedef enum eAddressType
-{
-    REGISTER_TYPE,
-    IDENTIFIER_TYPE,
-} eAddressType;
-
 // Entry in symbol table has symbol lexeme, type info
 typedef struct Identifier
 {

@@ -12,6 +12,12 @@ typedef struct Register
     GList *variables_held; // For identifiers held in registers
 } Register;
 
+typedef enum eAddressType
+{
+    REGISTER_TYPE,
+    IDENTIFIER_TYPE,
+} eAddressType;
+
 typedef struct Address
 {   
     eAddressType type; 
