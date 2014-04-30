@@ -15,7 +15,7 @@ typedef struct Register
 typedef enum eAddressType
 {
     REGISTER_TYPE,
-    IDENTIFIER_TYPE,
+    STACK_TYPE,
 } eAddressType;
 
 typedef struct Address
@@ -24,7 +24,7 @@ typedef struct Address
     union
     {
         Register *reg_addr_val;
-        struct Identifier *ident_addr_val;
+        int stack_offset_val;
     };
 } Address;
 
