@@ -86,17 +86,18 @@ char *get_arg_repr(Arg *arg)
 void print_instr_list(GPtrArray *instr_list, int num_instrs)
 {
     Instruction *instr;
-    char *arg1_repr;
-    char *arg2_repr;
+    char *arg1_repr,*arg2_repr, *result_repr;
     for (int i=0; i < num_instrs; i++)
     {
         instr = (Instruction*) g_ptr_array_index(instr_list, i);
         arg1_repr = get_arg_repr(instr->arg1);
         arg2_repr = get_arg_repr(instr->arg2);
-        printf("%s:%s:%s\n", OP_CODE_REPRS[instr->op_code], 
+        result_repr = instr->result->symbol;
+        printf("%s<-%s:%s:%s\n", result_repr, OP_CODE_REPRS[instr->op_code], 
                 arg1_repr, arg2_repr);
         free(arg1_repr);
         free(arg2_repr);
+        // Don't free result repr as it's using it's symbol
     }
 }
 

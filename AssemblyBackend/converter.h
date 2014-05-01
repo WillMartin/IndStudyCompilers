@@ -1,33 +1,17 @@
+#ifndef CONVERTER
+#define CONVERTER
+
 #include <glib.h>
 #include <stdbool.h>
 #include <assert.h>
+#include "register.h"
 #include "../InterCodeUtils/symbol_table.h"
 #include "../InterCodeUtils/inter_code_gen.h"
 
+
 #define NUM_REGISTERS 6
-
-typedef struct Register
-{
-    const char *repr;
-    GList *variables_held; // For identifiers held in registers
-} Register;
-
-typedef enum eAddressType
-{
-    REGISTER_TYPE,
-    STACK_TYPE,
-} eAddressType;
-
-typedef struct Address
-{   
-    eAddressType type; 
-    union
-    {
-        Register *reg_addr_val;
-        int stack_offset_val;
-    };
-} Address;
 
 void compile(GPtrArray *instr_list, GHashTable *symbol_table,
              int num_instrs, char *out_file);
 int get_byte_size(eType type);
+#endif
