@@ -1,4 +1,5 @@
 compileout
+assem_compiler
 *.o
 *.swp
 lex.yy.c

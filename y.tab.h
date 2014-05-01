@@ -76,14 +76,14 @@ extern int yydebug;
 typedef union YYSTYPE
 {
 /* Line 2053 of yacc.c  */
-#line 20 "ScanAndParse/C.y"
+#line 23 "ScanAndParse/C.y"
  
   int ival; 
   double dval; 
   char *cval;        
   long lval;
 
-  Arg argval;
+  Arg *argval;
   Identifier *idval;
   Instruction *insval;
   eType tval;
