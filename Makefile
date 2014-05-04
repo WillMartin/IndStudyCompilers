@@ -1,9 +1,9 @@
 CFLAGS=-std=c99 -g
 WITH_GLIB=`pkg-config --cflags --libs glib-2.0`
-GOMPILER=gcc
+OUT_FILE=compiler
 
 all: y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o
-	gcc $(CFLAGS) y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o -o compileout $(WITH_GLIB)
+	gcc $(CFLAGS) y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o -o $(OUT_FILE) $(WITH_GLIB)
 
 # Compile yacc file to C
 # -d command specifies to create a header with token definitions (y.tab.h)
