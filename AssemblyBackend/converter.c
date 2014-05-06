@@ -1,36 +1,7 @@
 #include "converter.h"
+/* Contains intermediate to assembly code conversion code. */
 
-// Define constants for register names
-//static const char *EBP_REGISTER = "ebp"; // Base (code) pointer reg
-//static const char *ESP_REGISTER = "esp"; // Stack pointer reg
-Register *EBP_REGISTER;
-Register *ESP_REGISTER;
-FILE *out_file;
-
-// Instructions
-static const char *MOVE_INSTR = "mov";
-static const char *PUSH_INSTR = "push";
-static const char *SUB_INSTR = "sub";
-static const char *ADD_INSTR = "add";
-static const char *MULT_INSTR = "imul";
-
-// Sizes
-static const int CHAR_SIZE = 1;
-static const int INT_SIZE = 4;
-static const int LONG_SIZE = 4;
-static const int DOUBLE_SIZE = 8;
-
-// Options
-static const char *DWORD_OPTION = "DWORD";
-
-Register *registers[NUM_REGISTERS];
-int cur_stack_offset = 0;
-// EAX, EBX, ECX, EDX, ESI, EDI
-
-// Init to start addresses
-int STACK_ADDR;
-int CODE_ADDR;
-
+/* Maps types to corresponding byte size. */
 int get_byte_size(eType type)
 {
     int size;
@@ -56,90 +27,25 @@ int get_byte_size(eType type)
     return size;
 }
 
+/* Writes out an instruction that requires an x86 command and one argument */
 void write_1instr(const char *command, char *arg)
 {
     fprintf(out_file, "\t%s %s\n", command, arg); 
 }
 
+/* Writes out an instruction that requires an x86 command, a command (e.g. DWORD)
+     and two arguments */
 void write_2instr_with_option(const char *command, const char *option,
                               char *arg1, char *arg2)
 {
-
-
     fprintf(out_file, "\t%s %s %s, %s\n", command, option, arg1, arg2); 
 }
 
+/* Writes out an instruction that requires an x86 command and two args */
 void write_2instr(const char *command,
                   char *arg1, char *arg2)
 {
     write_2instr_with_option(command, "", arg1, arg2);
-}
-
-char *addr_ind(char *reg)
-{
-    char *repr = malloc((strlen(reg) + 3) * sizeof(char));
-    sprintf(repr, "[%s]", reg);
-    return repr;
-}
-
-char *addr_mult(char *reg, int fact)
-{
-    // Assuming fact are less than 1,000 in this case
-    char *repr = malloc(sizeof(strlen(reg)) + 5);
-    sprintf(repr,"%s*%d", reg, fact);
-    return repr;
-}
-
-char *addr_add(char *reg, int offset)
-{
-    // Assuming offsets are less than 1,000 in this case
-    char *repr = malloc(sizeof(strlen(reg)) + 5);
-    if (offset < 0) { sprintf(repr,"%s-%d", reg, offset); }
-    else if (offset > 0) { sprintf(repr,"%s+%d", reg, offset); }
-    else { sprintf(repr, "%s", reg); }
-
-    return repr;
-}
-
-char *char_int(int x) 
-{
-    char *repr = malloc(sizeof(char)*10);
-    sprintf(repr, "%d", x);
-    return repr;
-}
-
-char *char_double(double x) 
-{
-    char *repr = malloc(sizeof(char)*10);
-    sprintf(repr, "%f", x);
-    return repr;
-}
-
-char *repr_const(Constant *c)
-{
-    char *repr;
-
-    switch (c->type)
-    {
-        case INTEGER:
-            repr = char_int(c->int_val);
-            break;
-        case DOUBLE:
-            repr = char_double(c->float_val);
-            break;
-        case CHAR:
-            repr = c->str_val;
-            break;
-        case LONG:
-            // TODO: give long's their own method
-            repr = char_int(c->int_val); 
-            break;
-        default:
-            printf("CHAR_CONSTANT ERROR: unknown type");
-            repr = "UH OH";
-            break;
-    }
-    return repr;
 }
 
 
@@ -153,10 +59,10 @@ void init_stack_variables(GHashTable *address_table)
     GList *head = local_ids;
 
     // Just push uninitialized space onto the stack
-    cur_stack_offset = 0;
+    CUR_STACK_OFFSET = 0;
     int data_size = 0;
     Identifier *cur_id;
-    char *esp_repr = repr_reg(registers[0]);
+    char *esp_repr = repr_reg(REGISTERS[0]);
     for (; local_ids != NULL; local_ids = local_ids->next)
     {
         cur_id = (Identifier *) local_ids->data;
@@ -164,25 +70,20 @@ void init_stack_variables(GHashTable *address_table)
 
         // Doesn't matter what we push on.
         write_1instr(PUSH_INSTR, esp_repr);
-        cur_stack_offset += data_size;
-        printf("VARIABLE %s AT OFFSET %d\n", cur_id->symbol, cur_stack_offset);
+        CUR_STACK_OFFSET += data_size;
+        printf("VARIABLE %s AT OFFSET %d\n", cur_id->symbol, CUR_STACK_OFFSET);
 
         // No value when initialized
         cur_id->on_stack = false;
-        cur_id->offset = cur_stack_offset;
+        cur_id->offset = CUR_STACK_OFFSET;
         cur_id->address_descriptor = NULL;
-        
-        //Address *addr = malloc(sizeof(Address));
-        //addr->type = STACK_TYPE;
-        //addr->stack_offset_val = offset;
-        //cur_id->address_descriptor = g_list_prepend(cur_id->address_descriptor, addr);
     }
     free(esp_repr);
     // Now free the list structure itself (not FULL as we still want the Identifiers)
     g_list_free(head);
 }
 
-// TODO: Better place to put these?
+/* Initializes all registers with Register structs along with their names */
 void init_registers()
 {
     ESP_REGISTER = malloc(sizeof(Register));
@@ -195,45 +96,19 @@ void init_registers()
 
     for (int i=0; i < NUM_REGISTERS; i++)
     {
-        registers[i] = malloc(sizeof(Register));
+        REGISTERS[i] = malloc(sizeof(Register));
         // As specified in Docs, an empty Glist* is NULL
-        registers[i]->variables_held = NULL;
+        REGISTERS[i]->variables_held = NULL;
     }
 
     // Manually give them reprs
-    registers[0]->repr = "eax";
-    registers[1]->repr = "ebx";
-    registers[2]->repr = "ecx";
-    registers[3]->repr = "edx";
-    registers[4]->repr = "esi";
-    registers[5]->repr = "edi";
+    REGISTERS[0]->repr = "eax";
+    REGISTERS[1]->repr = "ebx";
+    REGISTERS[2]->repr = "ecx";
+    REGISTERS[3]->repr = "edx";
+    REGISTERS[4]->repr = "esi";
+    REGISTERS[5]->repr = "edi";
 }
-
-
-const char *repr_op_code(eOPCode op_code)
-{
-    const char *const_repr;
-    switch (op_code)
-    {
-        case ASSIGN:
-            const_repr = MOVE_INSTR;
-            break;
-        case ADD:
-            const_repr = ADD_INSTR;
-            break;
-        case SUB:
-            const_repr = SUB_INSTR;
-            break;
-        case MULT:
-            const_repr = MULT_INSTR;
-            break;
-        default:
-            const_repr = "NOT IMPLEMENTED";
-            break;
-    }
-    return const_repr;
-}
-
 
 /* Clears all variables except <reserved_id> stored in the passed <reg> 
    Handy to dump everything except one variable so that we don't do 
@@ -264,8 +139,8 @@ void dump_reg_with_reserve(Register *reg, Identifier *reserved_id)
             {
                 // 2 - If this is the only place, store it at its designated place in the stack
                 char *esp_repr = repr_reg(ESP_REGISTER);
-                char *added_repr= addr_add(esp_repr, cur_id->offset);
-                char *result_loc = addr_ind(added_repr);
+                char *added_repr= repr_addr_add(esp_repr, cur_id->offset);
+                char *result_loc = repr_addr_ind(added_repr);
                 char *rrepr = repr_reg(reg);
                 write_2instr(MOVE_INSTR, result_loc, rrepr);
 
@@ -322,19 +197,17 @@ Register *get_reg_for_arg(Identifier *arg_id, Identifier *result_id,
     // Check to see if there's an empty register
     for (int i=0; i<NUM_REGISTERS; i++)
     {
-        if (registers[i]->variables_held == NULL)
+        if (REGISTERS[i]->variables_held == NULL)
         {
-            return registers[i];
+            return REGISTERS[i];
         }
     }
 
-    
     // id isn't currently in a register and there are no empty registers
     // Find out what values we need to store to open one up
 
     // will determine which register to dump
     int register_scores[NUM_REGISTERS] = {0};
-
 
     // Determine a score for each register based on the number of stores
     // we'll have to do
@@ -343,7 +216,7 @@ Register *get_reg_for_arg(Identifier *arg_id, Identifier *result_id,
         // Don't bother doing all the extra work if the register is reserved
         if (!reserved[i])
         {
-            GList *cur_list = registers[i]->variables_held;
+            GList *cur_list = REGISTERS[i]->variables_held;
             Identifier *cur_id;
             for (; cur_list!=NULL; cur_list=cur_list->next)
             {
@@ -377,18 +250,19 @@ Register *get_reg_for_arg(Identifier *arg_id, Identifier *result_id,
             register_scores[i] < min_score)
         {
             min_score = register_scores[i];
-            best_reg = registers[i];
+            best_reg = REGISTERS[i];
         }
     }
 
     return best_reg;
 }
 
+/* Returns the index for the given <reg> in the global REGISTERS */
 int get_index_for_reg(Register *reg)
 {
     for (int i=0; i<NUM_REGISTERS; i++)
     {
-        if (reg == registers[i])
+        if (reg == REGISTERS[i])
         {
             return i;
         }
@@ -448,66 +322,6 @@ void *get_regs(Instruction *instr, Register **res_reg,
     }
 }
 
-// Just get it's address for now, if they want what's 
-// in it the caller can indirect it
-char *repr_ident(Identifier *ident)
-{
-    char *esp_repr = repr_reg(ESP_REGISTER);
-    char *repr = addr_add(esp_repr, ident->offset);
-    free(esp_repr);
-    return repr;
-}
-
-
-// Returns the character representation for the arg.
-// If it's a constant it's just the constant
-// If it's an identifier return a reg if possible, otherwise the indirect
-// value of the stack location.
-// Either way it needs to be freed.
-char *repr_arg(Arg *arg)
-{
-    char *repr;
-    // Constant is pretty simple
-    if (arg->type == CONST)
-    {
-        repr = repr_const(arg->const_val);
-    }
-    else if (arg->type == IDENT)
-    {
-        Identifier *id = arg->ident_val;
-        // Check to see if it's already in a register - more efficient!
-        // Only one of these will be used.
-        Register *reg_loc = NULL; 
-        GList *arg_addrs = id->address_descriptor;
-        for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
-        {
-            reg_loc = arg_addrs->data;
-            break;
-        }
-
-        // Grab it from the register
-        if (reg_loc != NULL)
-        {
-            repr = repr_reg(reg_loc);
-        }
-        // If the current value held in the stack is current then we're fine
-        else if (arg->ident_val->on_stack)
-        {
-            char *stack_base = repr_reg(ESP_REGISTER);
-            char *with_offset = addr_add(stack_base, id->offset);
-            repr = addr_ind(with_offset);
-            free(stack_base);
-            free(with_offset);
-        }
-        // Indicates the variable is neither on the stack nor
-        // in a register -> has no representation
-        else { assert(false); }
-    }
-    else { assert(false); }
-    return repr;
-}
-
-
 /* Ensures that id is in the load_reg, either by loading it or just validating
    that it's already there. If the id has never been used (i.e. not in a register
    nor is it valid on the stack, just clear out the register, and tell the register
@@ -556,7 +370,7 @@ void ensure_register(Identifier *id, Register* load_reg)
         // Now for the actual loading
         char *load_from_direct = repr_ident(id);            
         // Want the value, not the address
-        load_from = addr_ind(load_from_direct);
+        load_from = repr_addr_ind(load_from_direct);
         free(load_from_direct);
     }
 
@@ -593,7 +407,7 @@ char *basic_handle_arg(Arg *arg, Register *load_reg)
     return repr;
 }
 
-
+/* Handle the case of a unary <instr> and write it out to a file */
 void compile_unary(Instruction *instr)
 {
     switch (instr->op_code)
@@ -662,6 +476,8 @@ void compile_unary(Instruction *instr)
     }
 }
 
+/* Compiles an instruction list using a basic register balancing scheme and
+    limited out-writing. */
 void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
                    int num_instrs)
 {   
@@ -736,16 +552,6 @@ void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
                     // be added/mult'd/etc. soon
                     // Ensure does any loading we might need to do.
                     ensure_register(cur_instr->arg1->ident_val, result_reg);
-                    /*
-                    printf("After reserving for first argument\n");
-                    fprintf(fp, "AFTER ENSURE\n");
-                    char *ident_arg = repr_ident(cur_instr->arg1->ident_val);
-                    char *indirect = addr_ind(ident_arg);
-                    write_2instr(fp, MOVE_INSTR, result_repr, indirect);
-                    fprintf(fp, "AFTER MOVE\n");
-                    free(ident_arg);
-                    free(indirect);
-                    */
                 }
 
                 op_arg_repr = repr_arg(cur_instr->arg2);
@@ -807,7 +613,7 @@ char *get_assem_arg_repr(Arg *arg)
 
 
 /* Naive way of compiling. Everything is loaded, operated on, then retured to 
-    its proper stack location */
+    its proper stack location. OLD and deprecated. */
 void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
                    int num_instrs)
 {
@@ -821,8 +627,8 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
 
             // Need to be careful with string functions so we can clean it all back up
             char *esp_repr = repr_reg(ESP_REGISTER);
-            char *added_repr= addr_add(esp_repr, instr->result->offset);
-            char *result_loc = addr_ind(added_repr);
+            char *added_repr= repr_addr_add(esp_repr, instr->result->offset);
+            char *result_loc = repr_addr_ind(added_repr);
             // Take care of intermediate strings
             free(esp_repr);
             free(added_repr);
@@ -842,12 +648,12 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
                     // Note: Move operations cannot be mem->mem
                     // Get addr of its ptr.
                     char *esp_repr = repr_reg(ESP_REGISTER);
-                    char *added_repr= addr_add(esp_repr, instr->arg1->ident_val->offset);
-                    arg_repr = addr_ind(added_repr);
+                    char *added_repr= repr_addr_add(esp_repr, instr->arg1->ident_val->offset);
+                    arg_repr = repr_addr_ind(added_repr);
                     free(esp_repr);
                     free(added_repr);
 
-                    char *intermed_reg_repr = repr_reg(registers[0]);
+                    char *intermed_reg_repr = repr_reg(REGISTERS[0]);
                     // Then load it
                     write_2instr(MOVE_INSTR, intermed_reg_repr, arg_repr);
                     free(arg_repr);
@@ -882,11 +688,11 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
             if (instr->arg1->type == IDENT) 
             { 
                 char *direct_repr = arg_repr;
-                arg_repr = addr_ind(arg_repr); 
+                arg_repr = repr_addr_ind(arg_repr); 
                 free(direct_repr);
             }
             // Save once since we use it 3 times in this block
-            char *esp_repr = repr_reg(registers[0]);
+            char *esp_repr = repr_reg(REGISTERS[0]);
             write_2instr(MOVE_INSTR, esp_repr, arg_repr);
             free(arg_repr);
     
@@ -895,7 +701,7 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
             if (instr->arg2->type == IDENT)
             {
                 char *direct_repr = arg_repr;
-                arg_repr = addr_ind(arg_repr); 
+                arg_repr = repr_addr_ind(arg_repr); 
                 free(direct_repr);
             }
 
@@ -903,8 +709,8 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
             free(arg_repr);
  
             // The final step is calculating where to store the result
-            char *add_repr = addr_add(esp_repr, instr->result->offset);
-            char *result_loc = addr_ind(add_repr); 
+            char *add_repr = repr_addr_add(esp_repr, instr->result->offset);
+            char *result_loc = repr_addr_ind(add_repr); 
             // Again just using register 0 for now
             write_2instr(MOVE_INSTR, result_loc, esp_repr);
             free(add_repr);
@@ -914,6 +720,7 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
     }
 }
 
+/* Write out some header boilerplate */
 void write_header()
 {
     fprintf(out_file, "SECTION .text\n");
@@ -921,6 +728,7 @@ void write_header()
     fprintf(out_file, "_start:\n");
 }
 
+/* Write out some program terminating boilerplate */
 void write_exit()
 {
     // Set exit code 0 - OK
@@ -932,11 +740,13 @@ void write_exit()
 
 }
 
+/* Opens the out_file  */
 void init_file(char *fname)
 {
     out_file = fopen(fname, "w+");
 }
 
+/* Closes the out_file */
 void close_file()
 {
     fclose(out_file);
@@ -960,7 +770,7 @@ void compile(GPtrArray *instr_list, GHashTable* symbol_table,
     write_exit();
     close_file();
     printf("END: Printing Registers\n");
-    print_registers(registers, NUM_REGISTERS);
+    print_registers(REGISTERS, NUM_REGISTERS);
 }
 
 

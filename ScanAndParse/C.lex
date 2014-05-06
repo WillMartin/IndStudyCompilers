@@ -26,7 +26,7 @@ nondigit        [a-zA-Z_]
 digit           [0-9]
 
 integer_val     {digit}+
-double_val      {integer_val}\.{integer_val}?
+real_val        {integer_val}\.{integer_val}?
 string_val      \"[^\"]*\"
 long_val        {integer_val}l
 
@@ -39,7 +39,7 @@ identifier      {nondigit}+
 {comment}   { /* Ignore comments too */ }
 
 {integer_val}   { yylval.ival = atoi(yytext); return INT_LITERAL; }
-{double_val}    { yylval.dval = atof(yytext); return DOUBLE_LITERAL; }
+{real_val}    { yylval.dval = atof(yytext); return REAL_LITERAL; }
 {long_val}      { yylval.dval = atol(yytext); return LONG_LITERAL; }
 {string_val}    { yylval.cval = strdup(yytext); return CHAR_LITERAL; }
 

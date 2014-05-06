@@ -8,7 +8,6 @@
 
 /* Basic code to hold register information, methods to manipulate
    them, print them, etc. */
-
 typedef struct Register
 {
     const char *repr;

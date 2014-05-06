@@ -39,7 +39,7 @@ GHashTable *symbol_table;
 
 /* Define tokens */
 %token <ival> INT_LITERAL
-%token <dval> DOUBLE_LITERAL 
+%token <dval> REAL_LITERAL 
 %token <cval> CHAR_LITERAL
 %token <lval> LONG_LITERAL
 %token <cval> IDENTIFIER
@@ -222,7 +222,7 @@ literal:      INT_LITERAL
                   $$->type = CONST;
                   $$->const_val = cons;
               }
-            | DOUBLE_LITERAL
+            | REAL_LITERAL
               {
                   Constant *cons = malloc(sizeof(Constant));
                   cons->type = DOUBLE;
