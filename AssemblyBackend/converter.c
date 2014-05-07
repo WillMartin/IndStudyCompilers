@@ -581,11 +581,14 @@ void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
         //result_reg->variables_held = g_list_prepend(result_reg->variables_held, result);
         // (2)
         g_list_free(result->address_descriptor); 
+        result->address_descriptor = NULL;
         result->address_descriptor = g_list_prepend(result->address_descriptor, result_reg);
         result->on_stack = false;
 
         write_2instr(repr_op_code(cur_instr->op_code), result_repr,
                      op_arg_repr);
+        free(result_repr);
+        free(op_arg_repr);
     }
 }
 

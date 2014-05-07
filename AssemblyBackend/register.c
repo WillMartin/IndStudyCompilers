@@ -32,7 +32,7 @@ GList *remove_reg_from_addrs(GList *addrs, Register *reg)
 /* Debug method to display <reg> in xml-ish fashion */
 void print_register_state(Register *reg)
 {
-    printf("<REGISTER: %s>\n", repr_reg(reg));
+    printf("<REGISTER: %s>\n", reg->repr);
     GList *vars = reg->variables_held;
     printf("\t<VARS>\n");
     for (; vars!=NULL; vars=vars->next)

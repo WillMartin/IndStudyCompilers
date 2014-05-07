@@ -262,7 +262,8 @@ id:         IDENTIFIER
                 // an error (unitialized).
 
                 $$ = get_identifier(symbol_table, $1);
-
+                // We're just using one copy of the string.
+                free($1);
                 if ($$ == NULL)
                 {
                     yyerror("Use of uninitialized value");

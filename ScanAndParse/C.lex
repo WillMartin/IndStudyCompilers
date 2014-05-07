@@ -53,7 +53,7 @@ char        { return CHAR_TYPE;   }
 =           { return ASSIGN_OP; }
 
     /* Important this this goes below any reserved keys (matches all char strings) */
-{identifier}    { yylval.cval = strdup(yytext); return IDENTIFIER; }
+{identifier}    { yylval.cval = strdup(yytext); printf("{{%s}}\n", yylval.cval); return IDENTIFIER; }
 
     /* For anything else, pass it to YACC to deal with */
 .           { return yytext[0]; }
