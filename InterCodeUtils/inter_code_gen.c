@@ -122,7 +122,7 @@ Instruction *gen_cast_instr(Arg *arg, eOPCode desired_type)
 }
 */
 
-/* Returns instruction set to perform multiplication 
+/* Returns instruction set to perform addition
    Returns NULL if the operation is unsuccessful 
         (e.g. wrong arg types)
 */
@@ -132,11 +132,24 @@ Instruction *gen_additive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2)
     Identifier *temp = get_temp_symbol();
     // For now we're just saying everything can be an int
     temp->type = INTEGER;
-    //TODO: change this..
-    temp->offset = 300;
 
     put_identifier(sym_table, temp);
     return init_instruction(ADD, arg1, arg2, temp);
+}
+
+/* Returns instruction set to perform addition
+   Returns NULL if the operation is unsuccessful 
+        (e.g. wrong arg types)
+*/
+Instruction *gen_subtractive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2)
+{
+    //TODO: implement this more fully
+    Identifier *temp = get_temp_symbol();
+    // For now we're just saying everything can be an int
+    temp->type = INTEGER;
+
+    put_identifier(sym_table, temp);
+    return init_instruction(SUB, arg1, arg2, temp);
 }
 
 /* Returns instruction set to perform multiplication 
@@ -149,8 +162,6 @@ Instruction *gen_multiplicative_instr(GHashTable *sym_table, Arg *arg1, Arg *arg
     Identifier *temp = get_temp_symbol();
     // For now we're just saying everything can be an int
     temp->type = INTEGER;
-    //TODO: change this..
-    temp->offset = 300;
 
     put_identifier(sym_table, temp);
     //TODO: implement this more fully 

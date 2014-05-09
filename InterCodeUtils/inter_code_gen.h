@@ -52,7 +52,8 @@ typedef struct Arg
     union 
     {
         Constant *const_val; // For now we'll just allow integer constants
-        struct Instruction *instr_val;
+        // Should only be used for jumps
+        struct Instruction *instr_val; 
         Identifier *ident_val;
     };
 } Arg;
@@ -66,6 +67,7 @@ typedef struct Instruction
     Arg *arg2;
     // Where the result of the instruction should be stored
     Identifier *result;
+
 } Instruction;
 
 
@@ -76,6 +78,7 @@ void print_instr_list(GPtrArray *instr_list, int num_instrs);
 
 Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2, Identifier *result);
 Instruction *gen_additive_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
+Instruction *gen_subtractive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2);
 Instruction *gen_multiplicative_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
 
 #endif // INTER_CODE_GEN

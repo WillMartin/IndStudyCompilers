@@ -31,7 +31,7 @@ typedef struct Identifier
     char *symbol;
     eType type;
 
-    // This is "it's" place on the stack. Should not change!
+    // This is "its" place on the stack. Should not change!
     bool on_stack; // Whether the most current version is here
     int offset; // Offset from start of location
     GList *address_descriptor; // Of type Address

@@ -1,0 +1,11 @@
+; I know that z has an offset of 28 and starts in register ebx, so we'll push then grab it.
+mov ebx, 5
+add ebx, '0'
+mov DWORD [esp + 28], ebx
+mov ecx, esp
+add ecx, 28
+
+mov eax, 4 ; Linux, sys.write
+mov ebx, 1 ; write stdout
+mov edx, 1 ; print out 1 byte 
+int 0x80

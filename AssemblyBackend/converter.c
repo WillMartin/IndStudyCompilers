@@ -49,6 +49,11 @@ void write_2instr(const char *command,
 }
 
 
+void calculate_next_use(GHashTable *address_table)
+{
+
+}
+
 /**
  *  Make room for local variables
  */

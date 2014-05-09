@@ -10,6 +10,7 @@
 #include "y.tab.h"
 
 extern int yylex();
+extern char *strdup();
 %}
  
  /* This tells flex to read only one input file 
@@ -39,21 +40,33 @@ identifier      {nondigit}+
 {comment}   { /* Ignore comments too */ }
 
 {integer_val}   { yylval.ival = atoi(yytext); return INT_LITERAL; }
-{real_val}    { yylval.dval = atof(yytext); return REAL_LITERAL; }
+{real_val}      { yylval.dval = atof(yytext); return REAL_LITERAL; }
 {long_val}      { yylval.dval = atol(yytext); return LONG_LITERAL; }
 {string_val}    { yylval.cval = strdup(yytext); return CHAR_LITERAL; }
 
-    /* Types - TODO: char, float, int, long */
-double      { return DOUBLE_TYPE; }
-int         { return INT_TYPE;    }
-long        { return LONG_TYPE;   }
-char        { return CHAR_TYPE;   }
+    /* Types - char, float, int, long */
+double      { return DOUBLE_TYPE_TOKEN; }
+int         { return INT_TYPE_TOKEN;    }
+long        { return LONG_TYPE_TOKEN;   }
+char        { return CHAR_TYPE_TOKEN;   }
 
-    /* TODO: Add a bunch of other assign operators */
+if          { return IF_TOKEN;    }
+else        { return ELSE_TOKEN;  }
+while       { return WHILE_TOKEN; }
+
+\|\|        { return OR_TOKEN;  }
+&&          { return AND_TOKEN; }
+==          { yylval.cval = strdup(yytext); return EQUALITY_TOKEN; }
+!=          { yylval.cval = strdup(yytext); return EQUALITY_TOKEN; }
+\<=         { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN; }
+>=          { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN; }
+\<          { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN;  }
+>           { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN;  }
+
 =           { return ASSIGN_OP; }
 
     /* Important this this goes below any reserved keys (matches all char strings) */
-{identifier}    { yylval.cval = strdup(yytext); printf("{{%s}}\n", yylval.cval); return IDENTIFIER; }
+{identifier}    { yylval.cval = strdup(yytext); return IDENTIFIER; }
 
     /* For anything else, pass it to YACC to deal with */
 .           { return yytext[0]; }

@@ -33,7 +33,7 @@ GHashTable *symbol_table;
 }
 /* Define a type for non-terms (?) */
 %type <idval> id
-%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression
+%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement
  
 %type <tval> type_specifier
 
@@ -44,8 +44,10 @@ GHashTable *symbol_table;
 %token <lval> LONG_LITERAL
 %token <cval> IDENTIFIER
 %token <cval> ASSIGN_OP
+%token <cval> EQUALITY_TOKEN
+%token <cval> RELATIONAL_TOKEN
 
-%token DOUBLE_TYPE INT_TYPE LONG_TYPE CHAR_TYPE
+%token DOUBLE_TYPE_TOKEN INT_TYPE_TOKEN LONG_TYPE_TOKEN CHAR_TYPE_TOKEN IF_TOKEN ELSE_TOKEN WHILE_TOKEN OR_TOKEN AND_TOKEN
 
 /* Define operators and their precedence */
 
@@ -54,7 +56,17 @@ GHashTable *symbol_table;
  /* Hardcoded to get something work */
 statement:
               compound_statement
+            | selection_statement
+            | iteration_statement
             | expression ';'
+
+selection_statement:
+            /* IMPORTANT! not allowing assignments within IFs */
+              IF_TOKEN '(' logical_or_expression ')' statement
+            | IF_TOKEN '(' logical_or_expression ')' statement ELSE_TOKEN statement
+
+iteration_statement:
+              WHILE_TOKEN '(' logical_or_expression ')' statement
 
 compound_statement:
               '{' block_item_list '}'
@@ -76,6 +88,23 @@ block_item:
 expression:       
               assignment_expression
             ;
+
+
+logical_or_expression:
+              logical_and_expression
+            | logical_or_expression OR_TOKEN logical_and_expression
+
+logical_and_expression:
+              equality_expression 
+            | logical_and_expression AND_TOKEN equality_expression
+        
+equality_expression:
+              relational_expression
+            | equality_expression EQUALITY_TOKEN relational_expression
+
+relational_expression:
+              additive_expression
+            | relational_expression RELATIONAL_TOKEN additive_expression
 
 additive_expression:
               multiplicative_expression
@@ -104,6 +133,27 @@ additive_expression:
                   */
                   $$ = arg;
               }
+            | additive_expression '-' multiplicative_expression
+              {
+                  Instruction *instr = gen_subtractive_instr(symbol_table, $1, $3);
+
+                  if (add_instr == NULL) 
+                  { 
+                      printf("INVALID SUBTRACT\n"); 
+                  } 
+                  else
+                  {
+                      add_instr(instr_list, &num_instrs, instr);
+                  }
+
+                    
+                  Arg *arg = malloc(sizeof(Arg));
+                  // Point instead to where the instr's result will be (it's temp symbol)
+                  arg->type = IDENT;
+                  arg->ident_val = instr->result;
+
+                  $$ = arg;
+              }
             ;
             
 multiplicative_expression:
@@ -125,11 +175,6 @@ multiplicative_expression:
                   // Point instead to where the instr's result will be (it's temp symbol)
                   arg->type = IDENT;
                   arg->ident_val = mult_instr->result;
-
-                  /* I think this i bad.
-                  arg->type = INSTR;
-                  arg->instr_val = mult_instr;
-                  */
                   $$ = arg;
               }
             ;
@@ -149,19 +194,13 @@ primary_expression:
               }
 
 assignment_expression:
-              additive_expression 
+              /* DEPRECATED with additions of conditionals additive_expression */
+              logical_or_expression
               /* TODO: id should be unary-expression */
             | id ASSIGN_OP expression 
               {
                   Instruction *instr = init_instruction(ASSIGN, $3, NULL, $1);
                   add_instr(instr_list, &num_instrs, instr);
-
-                  /* nothing can take this, so don't create a new arg here.
-                  Arg *ret_arg = malloc(sizeof(Arg));
-                  ret_arg->type = IDENT;
-                  ret_arg->ident_val = instr->result;
-                  $$ = ret_arg;
-                  */
                   $$ = NULL;
               }
             ;
@@ -190,12 +229,6 @@ declaration:
                   Instruction *instr = init_instruction(ASSIGN, $4, NULL, id);
                   add_instr(instr_list, &num_instrs, instr);
 
-                    
-                  /* // For now don't return anything because nothing operates on this further up
-                  $$ = malloc(sizeof(Arg));
-                  $$->type = IDENT;
-                  $$->ident_val = instr->result;
-                  */
                   $$ = NULL;
               }
               ;
@@ -206,10 +239,10 @@ initializer:
             ;
 
 type_specifier: 
-              INT_TYPE      { $$ = INTEGER; }
-            | DOUBLE_TYPE   { $$ = DOUBLE;  }
-            | LONG_TYPE     { $$ = LONG;    }
-            | CHAR_TYPE     { $$ = CHAR;    }
+              INT_TYPE_TOKEN      { $$ = INTEGER; }
+            | DOUBLE_TYPE_TOKEN   { $$ = DOUBLE;  }
+            | LONG_TYPE_TOKEN     { $$ = LONG;    }
+            | CHAR_TYPE_TOKEN     { $$ = CHAR;    }
             ;
 
 literal:      INT_LITERAL
@@ -295,6 +328,8 @@ int main()
     yyparse();
  
     print_instr_list(instr_list, num_instrs);
+    return 1;
+
     print_symbol_table(symbol_table);
     compile(instr_list, symbol_table, num_instrs, "inter.asm");
 } 
