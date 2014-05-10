@@ -33,6 +33,7 @@ GHashTable *symbol_table;
 }
 /* Define a type for non-terms (?) */
 %type <idval> id
+%type <ival> goto_place_holder
 %type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement
  
 %type <tval> type_specifier
@@ -49,24 +50,34 @@ GHashTable *symbol_table;
 
 %token DOUBLE_TYPE_TOKEN INT_TYPE_TOKEN LONG_TYPE_TOKEN CHAR_TYPE_TOKEN IF_TOKEN ELSE_TOKEN WHILE_TOKEN OR_TOKEN AND_TOKEN
 
+%nonassoc LOWER_THAN_ELSE 
+%nonassoc ELSE_TOKEN
 /* Define operators and their precedence */
 
 %%
  /* Rules */
- /* Hardcoded to get something work */
 statement:
-              compound_statement
-            | selection_statement
+              selection_statement
+            | compound_statement
             | iteration_statement
             | expression ';'
 
 selection_statement:
             /* IMPORTANT! not allowing assignments within IFs */
-              IF_TOKEN '(' logical_or_expression ')' statement
+              IF_TOKEN '(' logical_or_expression ')' statement %prec LOWER_THAN_ELSE
+              {
+                  $$ = $3;
+              }
             | IF_TOKEN '(' logical_or_expression ')' statement ELSE_TOKEN statement
+              {
+                  $$ = $3;
+              }
 
 iteration_statement:
               WHILE_TOKEN '(' logical_or_expression ')' statement
+              {
+                  $$ = $3;
+              }
 
 compound_statement:
               '{' block_item_list '}'
@@ -89,22 +100,95 @@ expression:
               assignment_expression
             ;
 
+goto_place_holder:
+            /* Just returns the current instr */
+                {
+                    $$ = num_instrs;
+                }
+            ;
 
 logical_or_expression:
               logical_and_expression
-            | logical_or_expression OR_TOKEN logical_and_expression
+            | logical_or_expression OR_TOKEN goto_place_holder logical_and_expression
+              {
+                  printf("OR\n");
+                  back_patch(instr_list, num_instrs, $1->false_list, $3);
+
+                  Arg *arg = malloc(sizeof(Arg));
+                  $$->type = INSTR;
+                  $$->true_list = merge_lists($1->true_list, $4->true_list);
+                  $$->false_list = $4->false_list;
+              }
 
 logical_and_expression:
               equality_expression 
-            | logical_and_expression AND_TOKEN equality_expression
+            | logical_and_expression AND_TOKEN goto_place_holder equality_expression
+              {
+                  printf("AND\n");
+                  back_patch(instr_list, num_instrs, $1->true_list, $3);
+
+                  $$ = malloc(sizeof(Arg));
+                  $$->type = INSTR;
+                  $$->true_list = $4->true_list;
+                  $$->false_list = merge_lists($1->false_list, $4->false_list);
+              }
         
 equality_expression:
               relational_expression
             | equality_expression EQUALITY_TOKEN relational_expression
+              {
+                  $$ = malloc(sizeof(Arg));
+                  $$->true_list = make_list(num_instrs);
+                  /* Plus 2 because we need an operation then the goto */
+                  $$->false_list = make_list(num_instrs + 2);
+
+                  eOPCode op_code;
+                  if (!strcmp($2, "==")) { op_code = EQ; }
+                  else if (!strcmp($2, "!=")) { op_code = NEQ; }
+                  else { assert(false); }
+
+                  Identifier *temp = get_temp_symbol();
+                  temp->type = INTEGER;
+                  put_identifier(symbol_table, temp);
+
+                  Instruction *op_instr = init_instruction(op_code, $1, $3, temp);
+                  add_instr(instr_list, &num_instrs, op_instr);
+
+                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  add_instr(instr_list, &num_instrs, true_goto);
+                  Instruction *false_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  add_instr(instr_list, &num_instrs, false_goto);
+              }
 
 relational_expression:
               additive_expression
             | relational_expression RELATIONAL_TOKEN additive_expression
+              {
+                  $$ = malloc(sizeof(Arg));
+                  $$->true_list = make_list(num_instrs);
+                  /* Plus 2 because we need an operation then the goto */
+                  $$->false_list = make_list(num_instrs + 2);
+
+                  eOPCode op_code;
+                  if (!strcmp($2, "<")) { op_code = LT; }
+                  else if (!strcmp($2, ">")) { op_code = GT; }
+                  else if (!strcmp($2, "<=")) { op_code = LEQ; }
+                  else if (!strcmp($2, ">=")) { op_code = GEQ; }
+                  else { assert(false); }
+
+                  Identifier *temp = get_temp_symbol();
+                  temp->type = INTEGER;
+                  put_identifier(symbol_table, temp);
+
+                  Instruction *op_instr = init_instruction(op_code, $1, $3, temp);
+                  add_instr(instr_list, &num_instrs, op_instr);
+
+                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  add_instr(instr_list, &num_instrs, true_goto);
+                  Instruction *false_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  add_instr(instr_list, &num_instrs, false_goto);
+
+              }
 
 additive_expression:
               multiplicative_expression
@@ -126,11 +210,6 @@ additive_expression:
                   // Point instead to where the instr's result will be (it's temp symbol)
                   arg->type = IDENT;
                   arg->ident_val = instr->result;
-
-                  /* I think this i bad.
-                  arg->type = INSTR;
-                  arg->instr_val=instr;
-                  */
                   $$ = arg;
               }
             | additive_expression '-' multiplicative_expression
@@ -294,6 +373,7 @@ id:         IDENTIFIER
                 // Attempts to grab symbol_id from table. If not there, return
                 // an error (unitialized).
 
+                printf("ID? %s\n", $1);
                 $$ = get_identifier(symbol_table, $1);
                 // We're just using one copy of the string.
                 free($1);

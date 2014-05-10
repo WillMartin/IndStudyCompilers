@@ -168,3 +168,37 @@ Instruction *gen_multiplicative_instr(GHashTable *sym_table, Arg *arg1, Arg *arg
     return init_instruction(MULT, arg1, arg2, temp);
 }
 
+/* Concatatenates <l1>, <l2> and returns the result */
+GList *merge_lists(GList *l1, GList *l2)
+{
+    return g_list_concat(l1, l2);
+}
+
+/* Create a new GList containing only <instr_idx> */
+GList *make_list(int instr_idx)
+{
+    return g_list_prepend(NULL, GINT_TO_POINTER(instr_idx));
+}
+
+/* Loops through the <list> of ints and inserts <instr_idx>
+    as the target jump for each instruction indexed by <list> */
+void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_idx)
+{
+    Instruction *goto_instr = get_instr(instr_list, num_instrs, instr_idx);
+    printf("Num instrs: %d, inst_idx: %d\n", num_instrs, instr_idx);
+    assert(goto_instr != NULL);
+    for (; list!=NULL; list=list->next)
+    {
+        int cur_idx = GPOINTER_TO_INT(list->data);
+        Instruction *cur_instr = get_instr(instr_list, num_instrs, instr_idx);
+        assert(cur_instr != NULL);
+        assert(cur_instr->op_code == GOTO);
+        assert(cur_instr->arg1 != NULL);
+
+        Arg *arg = malloc(sizeof(Arg));
+        arg->type = INSTR;
+        arg->instr_val = goto_instr;
+
+        cur_instr->arg1 = arg;
+    }
+}
