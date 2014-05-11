@@ -23,6 +23,7 @@ typedef enum eType
     DOUBLE,
     CHAR,
     LONG,
+    BOOL,
 } eType;
 
 // Entry in symbol table has symbol lexeme, type info

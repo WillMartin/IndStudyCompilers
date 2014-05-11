@@ -19,6 +19,9 @@ int get_byte_size(eType type)
         case LONG:
             size = LONG_SIZE;
             break;
+        case BOOL:
+            size = BOOL_SIZE;
+            break;
         default:
             printf("COMPILE ERROR: Unknown Type");
             size = -1;

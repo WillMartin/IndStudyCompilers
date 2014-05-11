@@ -34,7 +34,7 @@ GHashTable *symbol_table;
 /* Define a type for non-terms (?) */
 %type <idval> id
 %type <ival> goto_place_holder
-%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement
+%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement secondary_rel_expression
  
 %type <tval> type_specifier
 
@@ -48,7 +48,7 @@ GHashTable *symbol_table;
 %token <cval> EQUALITY_TOKEN
 %token <cval> RELATIONAL_TOKEN
 
-%token DOUBLE_TYPE_TOKEN INT_TYPE_TOKEN LONG_TYPE_TOKEN CHAR_TYPE_TOKEN IF_TOKEN ELSE_TOKEN WHILE_TOKEN OR_TOKEN AND_TOKEN
+%token DOUBLE_TYPE_TOKEN INT_TYPE_TOKEN LONG_TYPE_TOKEN CHAR_TYPE_TOKEN BOOL_TYPE_TOKEN IF_TOKEN ELSE_TOKEN WHILE_TOKEN OR_TOKEN AND_TOKEN TRUE_TOKEN FALSE_TOKEN
 
 %nonassoc LOWER_THAN_ELSE 
 %nonassoc ELSE_TOKEN
@@ -111,11 +111,11 @@ logical_or_expression:
               logical_and_expression
             | logical_or_expression OR_TOKEN goto_place_holder logical_and_expression
               {
-                  printf("OR\n");
+                  printf("Back patching! False List:");
+                  print_list($1->false_list);
                   back_patch(instr_list, num_instrs, $1->false_list, $3);
 
-                  Arg *arg = malloc(sizeof(Arg));
-                  $$->type = INSTR;
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = merge_lists($1->true_list, $4->true_list);
                   $$->false_list = $4->false_list;
               }
@@ -124,11 +124,9 @@ logical_and_expression:
               equality_expression 
             | logical_and_expression AND_TOKEN goto_place_holder equality_expression
               {
-                  printf("AND\n");
                   back_patch(instr_list, num_instrs, $1->true_list, $3);
 
-                  $$ = malloc(sizeof(Arg));
-                  $$->type = INSTR;
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = $4->true_list;
                   $$->false_list = merge_lists($1->false_list, $4->false_list);
               }
@@ -137,9 +135,9 @@ equality_expression:
               relational_expression
             | equality_expression EQUALITY_TOKEN relational_expression
               {
-                  $$ = malloc(sizeof(Arg));
-                  $$->true_list = make_list(num_instrs);
-                  /* Plus 2 because we need an operation then the goto */
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
+                  /* Plus 1/2 because we need an operation then the gotos */
+                  $$->true_list = make_list(num_instrs + 1);
                   $$->false_list = make_list(num_instrs + 2);
 
                   eOPCode op_code;
@@ -161,12 +159,26 @@ equality_expression:
               }
 
 relational_expression:
-              additive_expression
-            | relational_expression RELATIONAL_TOKEN additive_expression
-              {
-                  $$ = malloc(sizeof(Arg));
+                TRUE_TOKEN
+                {
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = make_list(num_instrs);
-                  /* Plus 2 because we need an operation then the goto */
+                  printf("In true, initing true list to %d\n", num_instrs);
+                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  add_instr(instr_list, &num_instrs, true_goto);
+                }
+              | FALSE_TOKEN
+                {
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
+                  $$->false_list = make_list(num_instrs);
+                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  add_instr(instr_list, &num_instrs, true_goto);
+                }
+              | secondary_rel_expression RELATIONAL_TOKEN additive_expression
+              {
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
+                  /* Plus 1/2 because we need an operation then the gotos */
+                  $$->true_list = make_list(num_instrs + 1);
                   $$->false_list = make_list(num_instrs + 2);
 
                   eOPCode op_code;
@@ -190,6 +202,11 @@ relational_expression:
 
               }
 
+secondary_rel_expression:
+              additive_expression
+            | relational_expression
+
+
 additive_expression:
               multiplicative_expression
             | additive_expression '+' multiplicative_expression
@@ -206,11 +223,8 @@ additive_expression:
                   }
 
                     
-                  Arg *arg = malloc(sizeof(Arg));
-                  // Point instead to where the instr's result will be (it's temp symbol)
-                  arg->type = IDENT;
-                  arg->ident_val = instr->result;
-                  $$ = arg;
+                  // Point instead to where the instr's result will be (its temp symbol)
+                  $$ = init_arg(IDENT, instr->result);
               }
             | additive_expression '-' multiplicative_expression
               {
@@ -226,12 +240,8 @@ additive_expression:
                   }
 
                     
-                  Arg *arg = malloc(sizeof(Arg));
                   // Point instead to where the instr's result will be (it's temp symbol)
-                  arg->type = IDENT;
-                  arg->ident_val = instr->result;
-
-                  $$ = arg;
+                  $$ = init_arg(IDENT, instr->result);
               }
             ;
             
@@ -250,21 +260,15 @@ multiplicative_expression:
                       add_instr(instr_list, &num_instrs, mult_instr);
                   }
 
-                  Arg *arg = malloc(sizeof(Arg));
                   // Point instead to where the instr's result will be (it's temp symbol)
-                  arg->type = IDENT;
-                  arg->ident_val = mult_instr->result;
-                  $$ = arg;
+                  $$ = init_arg(IDENT, mult_instr->result);
               }
             ;
 
 primary_expression:
               id 
               {
-                  Arg *arg = malloc(sizeof(Arg));
-                  arg->type = IDENT;
-                  arg->ident_val = $1;
-                  $$ = arg;
+                  $$ = init_arg(IDENT, $1);
               }
             | literal
             | '(' expression ')'
@@ -273,9 +277,10 @@ primary_expression:
               }
 
 assignment_expression:
-              /* DEPRECATED with additions of conditionals additive_expression */
-              logical_or_expression
+            /* Don't allow logicals and additives together */
+              additive_expression
               /* TODO: id should be unary-expression */
+            | logical_or_expression
             | id ASSIGN_OP expression 
               {
                   Instruction *instr = init_instruction(ASSIGN, $3, NULL, $1);
@@ -302,11 +307,59 @@ declaration:
                   // For now allocate everything to the stack
                   id->offset = stack_offset;
                   stack_offset += get_byte_size($1);
-
                   put_identifier(symbol_table, id);
 
-                  Instruction *instr = init_instruction(ASSIGN, $4, NULL, id);
-                  add_instr(instr_list, &num_instrs, instr);
+                  // If it's a boolean we have to do some alternative work
+                  if ($1 == BOOL)
+                  {
+                      Constant *true_const = malloc(sizeof(Constant));
+                      true_const->type = BOOL;
+                      true_const->bool_val = true;
+                      Arg *true_arg = init_arg(CONST, true_const);
+
+                      Constant *false_const = malloc(sizeof(Constant));
+                      false_const->type = BOOL;
+                      false_const->bool_val = false;
+                      Arg *false_arg = init_arg(CONST, false_const);
+
+                      // Make sure that initializer has something to backpatch
+                      // If it doesn't then it's not a boolean expression
+                      if ($4->false_list == NULL && $4->true_list == NULL)
+                      {
+                          yyerror("Invalid assignment to boolean assignment");
+                          YYERROR;
+                      }
+
+                      // Generate two assigns. A True GOTO and a False assign
+                      Instruction *true_assign = init_instruction(ASSIGN, 
+                                                        true_arg, NULL, id);
+                      Instruction *false_assign = init_instruction(ASSIGN, 
+                                                        false_arg, NULL, id);
+                      add_instr(instr_list, &num_instrs, true_assign);
+                      add_instr(instr_list, &num_instrs, false_assign);
+            
+                      // Link all the true and false jumps correctly.
+                      printf("BACK-PATCHING TRUE:");
+                      print_list($4->true_list);
+                      printf("BACK-PATCHING FALSE:");
+                      print_list($4->false_list);
+                      print_instr_list(instr_list, num_instrs);
+
+                      back_patch(instr_list, num_instrs, $4->true_list, 
+                                 num_instrs - 2);
+                      back_patch(instr_list, num_instrs, $4->false_list, 
+                                 num_instrs - 1);
+                  }
+                  else if ($1 != BOOL && $4->false_list == NULL && $4->true_list == NULL)
+                  {
+                      Instruction *instr = init_instruction(ASSIGN, $4, NULL, id);
+                      add_instr(instr_list, &num_instrs, instr);
+                  }
+                  else
+                  {
+                      yyerror("Invalid assignment to non-boolean");
+                      YYERROR;
+                  }
 
                   $$ = NULL;
               }
@@ -322,6 +375,7 @@ type_specifier:
             | DOUBLE_TYPE_TOKEN   { $$ = DOUBLE;  }
             | LONG_TYPE_TOKEN     { $$ = LONG;    }
             | CHAR_TYPE_TOKEN     { $$ = CHAR;    }
+            | BOOL_TYPE_TOKEN     { $$ = BOOL;    }
             ;
 
 literal:      INT_LITERAL
@@ -330,9 +384,7 @@ literal:      INT_LITERAL
                   cons->type = INTEGER;
                   cons->int_val = $1;
 
-                  $$ = malloc(sizeof(Arg));
-                  $$->type = CONST;
-                  $$->const_val = cons;
+                  $$ = init_arg(CONST, cons);
               }
             | REAL_LITERAL
               {
@@ -340,9 +392,7 @@ literal:      INT_LITERAL
                   cons->type = DOUBLE;
                   cons->int_val = $1;
 
-                  $$ = malloc(sizeof(Arg));
-                  $$->type = CONST;
-                  $$->const_val = cons;
+                  $$ = init_arg(CONST, cons);
               }
             | LONG_LITERAL
               {
@@ -350,9 +400,7 @@ literal:      INT_LITERAL
                   cons->type = LONG;
                   cons->long_val = $1;
 
-                  $$ = malloc(sizeof(Arg));
-                  $$->type = CONST;
-                  $$->const_val = cons;
+                  $$ = init_arg(CONST, cons);
               }
             | CHAR_LITERAL
               {
@@ -360,9 +408,7 @@ literal:      INT_LITERAL
                   cons->type = CHAR;
                   cons->str_val = $1;
 
-                  $$ = malloc(sizeof(Arg));
-                  $$->type = CONST;
-                  $$->const_val = cons;
+                  $$ = init_arg(CONST, cons);
               }
             ;
 
@@ -373,7 +419,6 @@ id:         IDENTIFIER
                 // Attempts to grab symbol_id from table. If not there, return
                 // an error (unitialized).
 
-                printf("ID? %s\n", $1);
                 $$ = get_identifier(symbol_table, $1);
                 // We're just using one copy of the string.
                 free($1);
@@ -407,6 +452,7 @@ int main()
 
     yyparse();
  
+    printf("Finished Parsing\n");
     print_instr_list(instr_list, num_instrs);
     return 1;
 

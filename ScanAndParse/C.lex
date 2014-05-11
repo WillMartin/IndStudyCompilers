@@ -39,9 +39,9 @@ identifier      {nondigit}+
 {ws}        { /* Don't do anything on white space */ }
 {comment}   { /* Ignore comments too */ }
 
-{integer_val}   { yylval.ival = atoi(yytext); return INT_LITERAL; }
-{real_val}      { yylval.dval = atof(yytext); return REAL_LITERAL; }
-{long_val}      { yylval.dval = atol(yytext); return LONG_LITERAL; }
+{integer_val}   { yylval.ival = atoi(yytext); return INT_LITERAL;    }
+{real_val}      { yylval.dval = atof(yytext); return REAL_LITERAL;   }
+{long_val}      { yylval.dval = atol(yytext); return LONG_LITERAL;   }
 {string_val}    { yylval.cval = strdup(yytext); return CHAR_LITERAL; }
 
     /* Types - char, float, int, long */
@@ -49,17 +49,20 @@ double      { return DOUBLE_TYPE_TOKEN; }
 int         { return INT_TYPE_TOKEN;    }
 long        { return LONG_TYPE_TOKEN;   }
 char        { return CHAR_TYPE_TOKEN;   }
+bool        { return BOOL_TYPE_TOKEN;   }
 
 if          { return IF_TOKEN;    }
 else        { return ELSE_TOKEN;  }
 while       { return WHILE_TOKEN; }
+true        { return TRUE_TOKEN;  }
+false       { return FALSE_TOKEN; }
 
 \|\|        { return OR_TOKEN;  }
 &&          { return AND_TOKEN; }
-==          { yylval.cval = strdup(yytext); return EQUALITY_TOKEN; }
-!=          { yylval.cval = strdup(yytext); return EQUALITY_TOKEN; }
-\<=         { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN; }
->=          { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN; }
+==          { yylval.cval = strdup(yytext); return EQUALITY_TOKEN;    }
+!=          { yylval.cval = strdup(yytext); return EQUALITY_TOKEN;    }
+\<=         { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN;  }
+>=          { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN;  }
 \<          { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN;  }
 >           { yylval.cval = strdup(yytext); return RELATIONAL_TOKEN;  }
 

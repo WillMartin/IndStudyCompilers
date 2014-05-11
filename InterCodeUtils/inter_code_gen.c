@@ -38,8 +38,11 @@ char *get_constant_repr(Constant *c)
             sprintf(repr, "%lu", c->long_val);
             break;
         case CHAR:
-            return c->str_val;
+            sprintf(repr, "%s", c->str_val);
             break; 
+        case BOOL:
+            sprintf(repr, "%i", c->bool_val);
+            break;
         default:
             return "CONSTANT-ERROR";
             break;
@@ -83,21 +86,26 @@ char *get_arg_repr(Arg *arg)
     return repr;
 }
 
+void print_instr(Instruction *instr)
+{
+    char *result_repr, *arg1_repr, *arg2_repr;
+    arg1_repr = get_arg_repr(instr->arg1);
+    arg2_repr = get_arg_repr(instr->arg2);
+    if (instr->op_code != GOTO) { result_repr = instr->result->symbol; }
+    else { result_repr = "NO RESULT"; }
+    printf("%s<-%s:%s:%s\n", result_repr, OP_CODE_REPRS[instr->op_code], 
+            arg1_repr, arg2_repr);
+    free(arg1_repr);
+    free(arg2_repr);
+    // Don't free result repr as it's using it's symbol
+}
+
 void print_instr_list(GPtrArray *instr_list, int num_instrs)
 {
-    Instruction *instr;
-    char *arg1_repr,*arg2_repr, *result_repr;
     for (int i=0; i < num_instrs; i++)
     {
-        instr = (Instruction*) g_ptr_array_index(instr_list, i);
-        arg1_repr = get_arg_repr(instr->arg1);
-        arg2_repr = get_arg_repr(instr->arg2);
-        result_repr = instr->result->symbol;
-        printf("%s<-%s:%s:%s\n", result_repr, OP_CODE_REPRS[instr->op_code], 
-                arg1_repr, arg2_repr);
-        free(arg1_repr);
-        free(arg2_repr);
-        // Don't free result repr as it's using it's symbol
+        Instruction *instr = (Instruction*) g_ptr_array_index(instr_list, i);
+        print_instr(instr);
     }
 }
 
@@ -168,6 +176,39 @@ Instruction *gen_multiplicative_instr(GHashTable *sym_table, Arg *arg1, Arg *arg
     return init_instruction(MULT, arg1, arg2, temp);
 }
 
+Arg *init_arg(eArgType type, void *val)
+{
+    Arg *arg = malloc(sizeof(Arg));
+    arg->true_list = NULL;
+    arg->false_list = NULL;
+    arg->type = type;
+    switch (type)
+    {
+        case CONST:
+            arg->const_val = (Constant*) val;
+            break;
+        case IDENT:
+            arg->ident_val = (Identifier*) val;
+            break;
+        case INSTR:
+            arg->instr_val = (Instruction*) val;
+            break;
+        default:
+            break;
+    }
+    return arg;
+}
+
+void *print_list(GList *l)
+{
+    printf("<");
+    for(; l!=NULL; l=l->next)
+    {
+        printf("%d, ", GPOINTER_TO_INT(l->data));
+    }
+    printf(">\n");
+}
+
 /* Concatatenates <l1>, <l2> and returns the result */
 GList *merge_lists(GList *l1, GList *l2)
 {
@@ -184,21 +225,24 @@ GList *make_list(int instr_idx)
     as the target jump for each instruction indexed by <list> */
 void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_idx)
 {
-    Instruction *goto_instr = get_instr(instr_list, num_instrs, instr_idx);
-    printf("Num instrs: %d, inst_idx: %d\n", num_instrs, instr_idx);
-    assert(goto_instr != NULL);
+    Instruction *op_instr = get_instr(instr_list, num_instrs, instr_idx);
+    assert(op_instr != NULL);
+    printf("Starting Back Patch\n");
+    printf("Op instr: %d, Total number: %d\n", instr_idx, num_instrs);
+    printf("patching into list:");
+    print_list(list);
+    print_instr_list(instr_list, num_instrs);
+
     for (; list!=NULL; list=list->next)
     {
         int cur_idx = GPOINTER_TO_INT(list->data);
-        Instruction *cur_instr = get_instr(instr_list, num_instrs, instr_idx);
-        assert(cur_instr != NULL);
-        assert(cur_instr->op_code == GOTO);
-        assert(cur_instr->arg1 != NULL);
+        Instruction *goto_instr = get_instr(instr_list, num_instrs, cur_idx);
 
-        Arg *arg = malloc(sizeof(Arg));
-        arg->type = INSTR;
-        arg->instr_val = goto_instr;
+        assert(goto_instr != NULL);
+        assert(goto_instr->op_code == GOTO);
+        assert(goto_instr->arg1 == NULL);
 
-        cur_instr->arg1 = arg;
+        Arg *arg = init_arg(INSTR, op_instr);
+        goto_instr->arg1 = arg;
     }
 }

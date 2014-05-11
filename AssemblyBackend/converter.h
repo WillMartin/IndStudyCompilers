@@ -21,6 +21,7 @@ static const int CHAR_SIZE = 1;
 static const int INT_SIZE = 4;
 static const int LONG_SIZE = 4;
 static const int DOUBLE_SIZE = 8;
+static const int BOOL_SIZE = 4;
 
 // Options
 static const char *DWORD_OPTION = "DWORD";

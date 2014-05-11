@@ -45,6 +45,7 @@ typedef struct Constant
         double float_val;
         char *str_val;
         long long_val;
+        bool bool_val;
     };
 } Constant;
 
@@ -53,6 +54,7 @@ typedef enum eArgType
     CONST, 
     INSTR, // A pointer to an Instruction struct 
     IDENT, // A pointer to an Ident struct (symbol_table.h)
+    BOOLEAN_EXPR, // Just used for transporting true/false lists up
 } eArgType;
 
 // Args can either be constants (nums), statics (strings), symbols (ptr to symbol table), or other instruction (ptr to Instruction)
@@ -94,7 +96,10 @@ Instruction *gen_additive_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
 Instruction *gen_subtractive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2);
 Instruction *gen_multiplicative_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
 
+Arg *init_arg(eArgType type, void *val);
+
 // Backtracking functions
+void *print_list(GList *l);
 GList *merge_lists(GList *l1, GList *l2);
 GList *make_list(int instr_idx);
 void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_idx);
