@@ -34,7 +34,7 @@ GHashTable *symbol_table;
 /* Define a type for non-terms (?) */
 %type <idval> id
 %type <ival> goto_place_holder
-%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement secondary_rel_expression
+%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement secondary_rel_expression end_if_jump
  
 %type <tval> type_specifier
 
@@ -64,13 +64,19 @@ statement:
 
 selection_statement:
             /* IMPORTANT! not allowing assignments within IFs */
-              IF_TOKEN '(' logical_or_expression ')' statement %prec LOWER_THAN_ELSE
+              IF_TOKEN '(' logical_or_expression ')' goto_place_holder compound_statement %prec LOWER_THAN_ELSE
               {
-                  $$ = $3;
+                  back_patch(instr_list, num_instrs, $3->true_list, $5);
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
+                  $$->next_list = merge_lists($3->false_list, $6->next_list);
               }
-            | IF_TOKEN '(' logical_or_expression ')' statement ELSE_TOKEN statement
+            | IF_TOKEN '(' logical_or_expression ')' goto_place_holder compound_statement end_if_jump ELSE_TOKEN goto_place_holder compound_statement
               {
-                  $$ = $3;
+                  back_patch(instr_list, num_instrs, $3->true_list, $5);
+                  back_patch(instr_list, num_instrs, $3->false_list, $9);
+                  GList *tmp = merge_lists($3->next_list, $7->next_list);
+                  $$ = init_arg(BOOLEAN_EXPR, NULL);
+                  $$->next_list = merge_lists(tmp, $10->next_list);
               }
 
 iteration_statement:
@@ -107,6 +113,17 @@ goto_place_holder:
                 }
             ;
 
+end_if_jump:
+             /* Just returns the current instr */
+                {
+                    $$ = init_arg(BOOLEAN_EXPR, NULL);
+                    $$->next_list = make_list(num_instrs);
+
+                    Instruction *goto_instr = init_instruction(GOTO, NULL, NULL, NULL);
+                    add_instr(instr_list, &num_instrs, goto_instr);
+                }
+            ;           
+
 logical_or_expression:
               logical_and_expression
             | logical_or_expression OR_TOKEN goto_place_holder logical_and_expression
@@ -118,6 +135,10 @@ logical_or_expression:
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = merge_lists($1->true_list, $4->true_list);
                   $$->false_list = $4->false_list;
+                  // Two arguments going into this are just a means to return
+                  // true/false lits
+                  free($1);
+                  free($4);
               }
 
 logical_and_expression:
@@ -129,6 +150,10 @@ logical_and_expression:
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = $4->true_list;
                   $$->false_list = merge_lists($1->false_list, $4->false_list);
+                  // Two arguments going into this are just a means to return
+                  // true/false lits
+                  free($1);
+                  free($4);
               }
         
 equality_expression:
@@ -156,6 +181,11 @@ equality_expression:
                   add_instr(instr_list, &num_instrs, true_goto);
                   Instruction *false_goto = init_instruction(GOTO, NULL, NULL, NULL);
                   add_instr(instr_list, &num_instrs, false_goto);
+
+                  // Two arguments going into this are just a means to return
+                  // true/false lits
+                  free($1);
+                  free($3);
               }
 
 relational_expression:
@@ -163,7 +193,6 @@ relational_expression:
                 {
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = make_list(num_instrs);
-                  printf("In true, initing true list to %d\n", num_instrs);
                   Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
                   add_instr(instr_list, &num_instrs, true_goto);
                 }
@@ -187,6 +216,7 @@ relational_expression:
                   else if (!strcmp($2, "<=")) { op_code = LEQ; }
                   else if (!strcmp($2, ">=")) { op_code = GEQ; }
                   else { assert(false); }
+                  free($2);
 
                   Identifier *temp = get_temp_symbol();
                   temp->type = INTEGER;
@@ -199,7 +229,6 @@ relational_expression:
                   add_instr(instr_list, &num_instrs, true_goto);
                   Instruction *false_goto = init_instruction(GOTO, NULL, NULL, NULL);
                   add_instr(instr_list, &num_instrs, false_goto);
-
               }
 
 secondary_rel_expression:
@@ -322,7 +351,6 @@ declaration:
                       false_const->bool_val = false;
                       Arg *false_arg = init_arg(CONST, false_const);
 
-                      // Make sure that initializer has something to backpatch
                       // If it doesn't then it's not a boolean expression
                       if ($4->false_list == NULL && $4->true_list == NULL)
                       {
@@ -333,22 +361,29 @@ declaration:
                       // Generate two assigns. A True GOTO and a False assign
                       Instruction *true_assign = init_instruction(ASSIGN, 
                                                         true_arg, NULL, id);
+                      Instruction *interm_goto = init_instruction(GOTO, NULL, NULL, NULL);
                       Instruction *false_assign = init_instruction(ASSIGN, 
                                                         false_arg, NULL, id);
                       add_instr(instr_list, &num_instrs, true_assign);
+                      add_instr(instr_list, &num_instrs, interm_goto);
                       add_instr(instr_list, &num_instrs, false_assign);
             
                       // Link all the true and false jumps correctly.
-                      printf("BACK-PATCHING TRUE:");
-                      print_list($4->true_list);
-                      printf("BACK-PATCHING FALSE:");
-                      print_list($4->false_list);
-                      print_instr_list(instr_list, num_instrs);
+                      //printf("BACK-PATCHING TRUE:");
+                      //print_list($4->true_list);
+                      //printf("BACK-PATCHING FALSE:");
+                      //print_list($4->false_list);
+                      //print_instr_list(instr_list, num_instrs);
 
                       back_patch(instr_list, num_instrs, $4->true_list, 
-                                 num_instrs - 2);
+                                 num_instrs - 3);
                       back_patch(instr_list, num_instrs, $4->false_list, 
                                  num_instrs - 1);
+                      //g_list_free_full($4->true_list, g_free);
+                      //g_list_free_full($4->false_list, g_free);
+                      g_list_free($4->true_list);
+                      g_list_free($4->false_list);
+                      free($4);
                   }
                   else if ($1 != BOOL && $4->false_list == NULL && $4->true_list == NULL)
                   {
