@@ -73,7 +73,6 @@ typedef struct Arg
     // For jumps/conditionals
     GList *true_list;
     GList *false_list;
-    GList *next_list;
 } Arg;
 
 // Represents an instruction as a generic Indirect-Triplet
@@ -84,7 +83,9 @@ typedef struct Instruction
     Arg *arg2;
     // Where the result of the instruction should be stored
     Identifier *result;
+    // For jumps
     struct Instruction *goto_addr;
+    char *label;
 } Instruction;
 
 

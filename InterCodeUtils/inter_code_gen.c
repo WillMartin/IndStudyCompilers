@@ -1,7 +1,6 @@
 #include "inter_code_gen.h"
 
-// Ptrs to instructions. Indirect-triplet approach
-// Triple list should NEVER be reorderd. As we reference places in it from _intr_list.
+static int NEXT_LABEL = 0;
 
 GPtrArray *init_instr_list()
 {
@@ -70,7 +69,7 @@ char *get_arg_repr(Arg *arg)
                 break;
             case INSTR:
                 repr = malloc(6 * sizeof(char));
-                sprintf(repr, "INSTR");
+                sprintf(repr, "%s", arg->instr_val->label);
                 break;
             case IDENT:;
                 char *sym = arg->ident_val->symbol;
@@ -111,17 +110,26 @@ void print_instr(Instruction *instr)
     }
     else if (instr->op_code == GOTO) 
     { 
-        printf("GOTO INSTR\n");
+        char *label = instr->label != NULL ? instr->label : "";
+        printf("%s GOTO %s\n", label, instr->goto_addr->label);
     }
     else if (instr->op_code == NOP)
     {
-        printf("NOP\n");
+        char *label = instr->label != NULL ? instr->label : "";
+        printf("%s NOP\n", label);
+    }
+    else if (instr->op_code == ASSIGN)
+    {
+        result_repr = instr->result->symbol; 
+        char *label = instr->label != NULL ? instr->label : "";
+        printf("%s %s = %s\n", label, result_repr, arg1_repr);
     }
     else 
     { 
         result_repr = instr->result->symbol; 
-        printf("%s<-%s:%s:%s\n", result_repr, OP_CODE_REPRS[instr->op_code], 
-               arg1_repr, arg2_repr);
+        char *label = instr->label != NULL ? instr->label : "";
+        printf("%s %s=%s %s %s\n", label, result_repr, arg1_repr,
+               OP_CODE_REPRS[instr->op_code], arg2_repr);
     }
 
     free(arg1_repr);
@@ -147,6 +155,7 @@ Instruction *init_base_instr(eOPCode op_code, Arg *arg1, Arg *arg2,
     instr->arg2 = arg2;
     instr->result = result;
     instr->goto_addr = goto_addr;
+    instr->label = NULL;
     return instr;
 }
 
@@ -279,17 +288,24 @@ GList *make_list(int instr_idx)
     return g_list_prepend(NULL, GINT_TO_POINTER(instr_idx));
 }
 
+char *get_next_label()
+{
+    char *label = malloc(5);
+    sprintf(label, "l%d", NEXT_LABEL);
+    NEXT_LABEL += 1;
+    return label;
+
+}
+
 /* Loops through the <list> of ints and inserts <instr_idx>
     as the target jump for each instruction indexed by <list> */
 void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_idx)
 {
     Instruction *op_instr = get_instr(instr_list, num_instrs, instr_idx);
     assert(op_instr != NULL);
-    printf("Starting Back Patch\n");
-    printf("Op instr: %d, Total number: %d\n", instr_idx, num_instrs);
-    printf("patching into list:");
-    print_list(list);
-    print_instr_list(instr_list, num_instrs);
+
+    // Make sure that the op_instr has a label, if it doesn't make one
+    if (op_instr->label == NULL) { op_instr->label = get_next_label(); }
 
     for (; list!=NULL; list=list->next)
     {

@@ -13,6 +13,7 @@ int num_instrs;
 // Assign then increment
 int stack_offset;
 GHashTable *symbol_table;
+int yyerror(const char *str);
 %}
 
 /* Define start symbol */
@@ -33,8 +34,8 @@ GHashTable *symbol_table;
 }
 /* Define a type for non-terms (?) */
 %type <idval> id
-%type <ival> goto_place_holder
-%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement secondary_rel_expression end_if_jump
+%type <ival> goto_place_holder end_if_jump
+%type <argval> statement expression compound_statement assignment_expression block_item block_item_list declaration literal initializer additive_expression multiplicative_expression primary_expression logical_or_expression logical_and_expression equality_expression relational_expression selection_statement iteration_statement secondary_rel_expression 
  
 %type <tval> type_specifier
 
@@ -63,26 +64,51 @@ statement:
             | expression ';'
 
 selection_statement:
-            /* IMPORTANT! not allowing assignments within IFs */
+            /* IMPORTANT! not allowing assignments within IF conditionals */
+            /* Also, not implementing the book's way of doing things here */
               IF_TOKEN '(' logical_or_expression ')' goto_place_holder compound_statement %prec LOWER_THAN_ELSE
               {
+                  // If logical expr is true, enter if
                   back_patch(instr_list, num_instrs, $3->true_list, $5);
-                  $$ = init_arg(BOOLEAN_EXPR, NULL);
-                  $$->next_list = merge_lists($3->false_list, $6->next_list);
+                  // If it's not go after compound_statement 
+                  // Generate NOP for ease
+                  Instruction *nop = init_nop_instr();
+                  add_instr(instr_list, &num_instrs, nop);
+                  // -1 to patch to the NOP we just added
+                  back_patch(instr_list, num_instrs, $3->false_list, num_instrs - 1);
+
+                  //$$ = init_arg(BOOLEAN_EXPR, NULL);
+                  // TODO: figure out if we need to return anything here
+                  $$ = NULL;
               }
-            | IF_TOKEN '(' logical_or_expression ')' goto_place_holder compound_statement end_if_jump ELSE_TOKEN goto_place_holder compound_statement
+            | IF_TOKEN '(' logical_or_expression ')' goto_place_holder compound_statement end_if_jump ELSE_TOKEN compound_statement
               {
+                  // controls for initial jump
                   back_patch(instr_list, num_instrs, $3->true_list, $5);
-                  back_patch(instr_list, num_instrs, $3->false_list, $9);
-                  GList *tmp = merge_lists($3->next_list, $7->next_list);
-                  $$ = init_arg(BOOLEAN_EXPR, NULL);
-                  $$->next_list = merge_lists(tmp, $10->next_list);
+                  // Add a NOP at the end of everything
+                  Instruction *nop = init_nop_instr();
+                  add_instr(instr_list, &num_instrs, nop);
+
+                  GList *else_skip_list = make_list($7-1);
+
+                  // Backpatch both jump over else and init jump to the end.
+                  back_patch(instr_list, num_instrs, $3->false_list, num_instrs-1);
+                  back_patch(instr_list, num_instrs, else_skip_list, num_instrs-1);
               }
 
 iteration_statement:
-              WHILE_TOKEN '(' logical_or_expression ')' statement
+              /*  1            2             3            4            5        6             7          8 */
+              WHILE_TOKEN goto_place_holder '(' logical_or_expression ')' goto_place_holder statement end_if_jump 
               {
-                  $$ = $3;
+                  back_patch(instr_list, num_instrs, $4->true_list, $6);
+                  // And generate one NOP for when the loop terminates
+                  Instruction *nop = init_nop_instr();
+                  add_instr(instr_list, &num_instrs, nop);
+                  back_patch(instr_list, num_instrs, $4->false_list, $8);
+
+                  // Don't forget to jump back to the top
+                  GList *jump_list = make_list($8-1);
+                  back_patch(instr_list, num_instrs, jump_list, $2);
               }
 
 compound_statement:
@@ -114,14 +140,13 @@ goto_place_holder:
             ;
 
 end_if_jump:
-             /* Just returns the current instr */
+             /* Returns the instr AFTER the newly made empty GOTO */
                 {
-                    $$ = init_arg(BOOLEAN_EXPR, NULL);
-                    $$->next_list = make_list(num_instrs);
-
                     // NULL until it is backpatched
                     Instruction *goto_instr = init_goto_instr(NULL);
                     add_instr(instr_list, &num_instrs, goto_instr);
+
+                    $$ = num_instrs;
                 }
             ;           
 
@@ -129,8 +154,6 @@ logical_or_expression:
               logical_and_expression
             | logical_or_expression OR_TOKEN goto_place_holder logical_and_expression
               {
-                  printf("Back patching! False List:");
-                  print_list($1->false_list);
                   back_patch(instr_list, num_instrs, $1->false_list, $3);
 
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
@@ -360,13 +383,6 @@ declaration:
                       add_instr(instr_list, &num_instrs, false_assign);
                       add_instr(instr_list, &num_instrs, nop);
             
-                      // Link all the true and false jumps correctly.
-                      //printf("BACK-PATCHING TRUE:");
-                      //print_list($4->true_list);
-                      //printf("BACK-PATCHING FALSE:");
-                      //print_list($4->false_list);
-                      //print_instr_list(instr_list, num_instrs);
-
                       back_patch(instr_list, num_instrs, $4->true_list, 
                                  num_instrs - 3);
                       back_patch(instr_list, num_instrs, $4->false_list, 
