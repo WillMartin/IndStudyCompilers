@@ -119,7 +119,8 @@ end_if_jump:
                     $$ = init_arg(BOOLEAN_EXPR, NULL);
                     $$->next_list = make_list(num_instrs);
 
-                    Instruction *goto_instr = init_instruction(GOTO, NULL, NULL, NULL);
+                    // NULL until it is backpatched
+                    Instruction *goto_instr = init_goto_instr(NULL);
                     add_instr(instr_list, &num_instrs, goto_instr);
                 }
             ;           
@@ -170,16 +171,11 @@ equality_expression:
                   else if (!strcmp($2, "!=")) { op_code = NEQ; }
                   else { assert(false); }
 
-                  Identifier *temp = get_temp_symbol();
-                  temp->type = INTEGER;
-                  put_identifier(symbol_table, temp);
+                  // NULL goto until it is backpatched
+                  Instruction *cond_instr = init_cond_instr(op_code, $1, $3, NULL);
+                  add_instr(instr_list, &num_instrs, cond_instr);
 
-                  Instruction *op_instr = init_instruction(op_code, $1, $3, temp);
-                  add_instr(instr_list, &num_instrs, op_instr);
-
-                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
-                  add_instr(instr_list, &num_instrs, true_goto);
-                  Instruction *false_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  Instruction *false_goto = init_goto_instr(NULL);
                   add_instr(instr_list, &num_instrs, false_goto);
 
                   // Two arguments going into this are just a means to return
@@ -193,15 +189,15 @@ relational_expression:
                 {
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = make_list(num_instrs);
-                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  Instruction *true_goto = init_goto_instr(NULL);
                   add_instr(instr_list, &num_instrs, true_goto);
                 }
               | FALSE_TOKEN
                 {
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->false_list = make_list(num_instrs);
-                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
-                  add_instr(instr_list, &num_instrs, true_goto);
+                  Instruction *false_goto = init_goto_instr(NULL);
+                  add_instr(instr_list, &num_instrs, false_goto);
                 }
               | secondary_rel_expression RELATIONAL_TOKEN additive_expression
               {
@@ -218,16 +214,11 @@ relational_expression:
                   else { assert(false); }
                   free($2);
 
-                  Identifier *temp = get_temp_symbol();
-                  temp->type = INTEGER;
-                  put_identifier(symbol_table, temp);
+                  // NULL goto until it is backpatched
+                  Instruction *cond_instr = init_cond_instr(op_code, $1, $3, NULL);
+                  add_instr(instr_list, &num_instrs, cond_instr);
 
-                  Instruction *op_instr = init_instruction(op_code, $1, $3, temp);
-                  add_instr(instr_list, &num_instrs, op_instr);
-
-                  Instruction *true_goto = init_instruction(GOTO, NULL, NULL, NULL);
-                  add_instr(instr_list, &num_instrs, true_goto);
-                  Instruction *false_goto = init_instruction(GOTO, NULL, NULL, NULL);
+                  Instruction *false_goto = init_goto_instr(NULL);
                   add_instr(instr_list, &num_instrs, false_goto);
               }
 
@@ -312,7 +303,7 @@ assignment_expression:
             | logical_or_expression
             | id ASSIGN_OP expression 
               {
-                  Instruction *instr = init_instruction(ASSIGN, $3, NULL, $1);
+                  Instruction *instr = init_assign_instr($3, $1);
                   add_instr(instr_list, &num_instrs, instr);
                   $$ = NULL;
               }
@@ -358,15 +349,16 @@ declaration:
                           YYERROR;
                       }
 
-                      // Generate two assigns. A True GOTO and a False assign
-                      Instruction *true_assign = init_instruction(ASSIGN, 
-                                                        true_arg, NULL, id);
-                      Instruction *interm_goto = init_instruction(GOTO, NULL, NULL, NULL);
-                      Instruction *false_assign = init_instruction(ASSIGN, 
-                                                        false_arg, NULL, id);
+                      Instruction *true_assign = init_assign_instr(true_arg, id);
+                      // Need to link interm goto to it. It NEEDS to be added last
+                      Instruction *nop = init_nop_instr();
+                      Instruction *interm_goto = init_goto_instr(nop);
+                      Instruction *false_assign = init_assign_instr(false_arg, id);
+
                       add_instr(instr_list, &num_instrs, true_assign);
                       add_instr(instr_list, &num_instrs, interm_goto);
                       add_instr(instr_list, &num_instrs, false_assign);
+                      add_instr(instr_list, &num_instrs, nop);
             
                       // Link all the true and false jumps correctly.
                       //printf("BACK-PATCHING TRUE:");
@@ -379,15 +371,13 @@ declaration:
                                  num_instrs - 3);
                       back_patch(instr_list, num_instrs, $4->false_list, 
                                  num_instrs - 1);
-                      //g_list_free_full($4->true_list, g_free);
-                      //g_list_free_full($4->false_list, g_free);
                       g_list_free($4->true_list);
                       g_list_free($4->false_list);
                       free($4);
                   }
                   else if ($1 != BOOL && $4->false_list == NULL && $4->true_list == NULL)
                   {
-                      Instruction *instr = init_instruction(ASSIGN, $4, NULL, id);
+                      Instruction *instr = init_assign_instr($4, id);
                       add_instr(instr_list, &num_instrs, instr);
                   }
                   else
@@ -487,7 +477,6 @@ int main()
 
     yyparse();
  
-    printf("Finished Parsing\n");
     print_instr_list(instr_list, num_instrs);
     return 1;
 

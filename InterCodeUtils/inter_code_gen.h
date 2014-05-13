@@ -23,7 +23,8 @@ typedef enum eOPCode
     SUB,
     UMINUS, // unary minus sign
     GOTO,   // unconditional goto
-    // Relative operators
+    NOP,    // No-op for ease
+    // Relative operators (Cond. GOTO)
     EQ,
     NEQ,
     LT,
@@ -34,7 +35,7 @@ typedef enum eOPCode
 
 // For debugging only
 static const char* OP_CODE_REPRS[] = {"=", "+", "CAST", "/", "*", "-", "-(UNARY)",
-                      "GOTO", "==", "!=", "<", ">", "<=", ">=" };
+                      "GOTO", "NOP", "==", "!=", "<", ">", "<=", ">=" };
 
 typedef struct Constant
 {
@@ -83,6 +84,7 @@ typedef struct Instruction
     Arg *arg2;
     // Where the result of the instruction should be stored
     Identifier *result;
+    struct Instruction *goto_addr;
 } Instruction;
 
 
@@ -92,6 +94,11 @@ Instruction *get_instr(GPtrArray *instr_list, int num_instrs, int index);
 void print_instr_list(GPtrArray *instr_list, int num_instrs);
 
 Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2, Identifier *result);
+Instruction *init_goto_instr(Instruction *goto_addr);
+Instruction *init_cond_instr(eOPCode op_code, Arg *arg1, Arg *arg2, Instruction *goto_addr);
+Instruction *init_assign_instr(Arg *arg1, Identifier *result);
+Instruction *init_nop_instr();
+
 Instruction *gen_additive_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
 Instruction *gen_subtractive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2);
 Instruction *gen_multiplicative_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);

@@ -86,15 +86,44 @@ char *get_arg_repr(Arg *arg)
     return repr;
 }
 
+// Helper for printing
+bool is_relative_op(eOPCode op_code)
+{
+    if (op_code == EQ || op_code == NEQ ||
+        op_code == GT || op_code == LT  ||
+        op_code == GEQ || op_code == LEQ)
+    {
+        return true;
+    }
+    return false;
+}
+
+
 void print_instr(Instruction *instr)
 {
     char *result_repr, *arg1_repr, *arg2_repr;
     arg1_repr = get_arg_repr(instr->arg1);
     arg2_repr = get_arg_repr(instr->arg2);
-    if (instr->op_code != GOTO) { result_repr = instr->result->symbol; }
-    else { result_repr = "NO RESULT"; }
-    printf("%s<-%s:%s:%s\n", result_repr, OP_CODE_REPRS[instr->op_code], 
-            arg1_repr, arg2_repr);
+    if (is_relative_op(instr->op_code))
+    {
+        printf("IF %s %s %s-> GOTO INSTR\n", arg1_repr,
+               OP_CODE_REPRS[instr->op_code], arg2_repr);
+    }
+    else if (instr->op_code == GOTO) 
+    { 
+        printf("GOTO INSTR\n");
+    }
+    else if (instr->op_code == NOP)
+    {
+        printf("NOP\n");
+    }
+    else 
+    { 
+        result_repr = instr->result->symbol; 
+        printf("%s<-%s:%s:%s\n", result_repr, OP_CODE_REPRS[instr->op_code], 
+               arg1_repr, arg2_repr);
+    }
+
     free(arg1_repr);
     free(arg2_repr);
     // Don't free result repr as it's using it's symbol
@@ -109,15 +138,44 @@ void print_instr_list(GPtrArray *instr_list, int num_instrs)
     }
 }
 
-Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2,
-                              Identifier *result)
+Instruction *init_base_instr(eOPCode op_code, Arg *arg1, Arg *arg2,
+                              Identifier *result, Instruction *goto_addr)
 {
     Instruction *instr = malloc(sizeof(Instruction));
     instr->op_code = op_code;
     instr->arg1 = arg1;
     instr->arg2 = arg2;
     instr->result = result;
+    instr->goto_addr = goto_addr;
     return instr;
+}
+
+Instruction *init_instr(eOPCode op_code, Arg *arg1, Arg *arg2,
+                              Identifier *result)
+{
+    return init_base_instr(op_code, arg1, arg2, result, NULL);
+}
+
+Instruction *init_goto_instr(Instruction *goto_addr)
+{
+    return init_base_instr(GOTO, NULL, NULL, NULL, goto_addr);
+}
+
+Instruction *init_cond_instr(eOPCode op_code, Arg *arg1, Arg *arg2, 
+                             Instruction *goto_addr)
+{
+    return init_base_instr(op_code, arg1, arg2, NULL, goto_addr);
+}
+
+Instruction *init_assign_instr(Arg *arg1, Identifier *result)
+{
+    return init_base_instr(ASSIGN, arg1, NULL, result, NULL);
+}
+
+
+Instruction *init_nop_instr() 
+{
+    return init_base_instr(NOP, NULL, NULL, NULL, NULL);
 }
 
 /* Returns instruction set to perform cast
@@ -142,7 +200,7 @@ Instruction *gen_additive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2)
     temp->type = INTEGER;
 
     put_identifier(sym_table, temp);
-    return init_instruction(ADD, arg1, arg2, temp);
+    return init_instr(ADD, arg1, arg2, temp);
 }
 
 /* Returns instruction set to perform addition
@@ -157,7 +215,7 @@ Instruction *gen_subtractive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2)
     temp->type = INTEGER;
 
     put_identifier(sym_table, temp);
-    return init_instruction(SUB, arg1, arg2, temp);
+    return init_instr(SUB, arg1, arg2, temp);
 }
 
 /* Returns instruction set to perform multiplication 
@@ -173,7 +231,7 @@ Instruction *gen_multiplicative_instr(GHashTable *sym_table, Arg *arg1, Arg *arg
 
     put_identifier(sym_table, temp);
     //TODO: implement this more fully 
-    return init_instruction(MULT, arg1, arg2, temp);
+    return init_instr(MULT, arg1, arg2, temp);
 }
 
 Arg *init_arg(eArgType type, void *val)
@@ -239,10 +297,11 @@ void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_id
         Instruction *goto_instr = get_instr(instr_list, num_instrs, cur_idx);
 
         assert(goto_instr != NULL);
-        assert(goto_instr->op_code == GOTO);
-        assert(goto_instr->arg1 == NULL);
+        // Could be cond
+        //assert(goto_instr->op_code == GOTO);
+        //assert(goto_instr->arg1 == NULL);
 
         Arg *arg = init_arg(INSTR, op_instr);
-        goto_instr->arg1 = arg;
+        goto_instr->goto_addr = op_instr;
     }
 }
