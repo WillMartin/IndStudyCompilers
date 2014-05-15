@@ -81,6 +81,7 @@ selection_statement:
                   // TODO: figure out if we need to return anything here
                   $$ = NULL;
               }
+              /*                    3                        5                 6              7                          9   */
             | IF_TOKEN '(' logical_or_expression ')' goto_place_holder compound_statement end_if_jump ELSE_TOKEN compound_statement
               {
                   // controls for initial jump
@@ -92,7 +93,7 @@ selection_statement:
                   GList *else_skip_list = make_list($7-1);
 
                   // Backpatch both jump over else and init jump to the end.
-                  back_patch(instr_list, num_instrs, $3->false_list, num_instrs-1);
+                  back_patch(instr_list, num_instrs, $3->false_list, $7);
                   back_patch(instr_list, num_instrs, else_skip_list, num_instrs-1);
               }
 
@@ -185,9 +186,9 @@ equality_expression:
             | equality_expression EQUALITY_TOKEN relational_expression
               {
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
-                  /* Plus 1/2 because we need an operation then the gotos */
-                  $$->true_list = make_list(num_instrs + 1);
-                  $$->false_list = make_list(num_instrs + 2);
+                  /* Cond operator and goto folllowed by the false GOTO */
+                  $$->true_list = make_list(num_instrs);
+                  $$->false_list = make_list(num_instrs + 1);
 
                   eOPCode op_code;
                   if (!strcmp($2, "==")) { op_code = EQ; }
@@ -225,9 +226,8 @@ relational_expression:
               | secondary_rel_expression RELATIONAL_TOKEN additive_expression
               {
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
-                  /* Plus 1/2 because we need an operation then the gotos */
-                  $$->true_list = make_list(num_instrs + 1);
-                  $$->false_list = make_list(num_instrs + 2);
+                  $$->true_list = make_list(num_instrs);
+                  $$->false_list = make_list(num_instrs + 1);
 
                   eOPCode op_code;
                   if (!strcmp($2, "<")) { op_code = LT; }
@@ -494,7 +494,6 @@ int main()
     yyparse();
  
     print_instr_list(instr_list, num_instrs);
-    return 1;
 
     print_symbol_table(symbol_table);
     compile(instr_list, symbol_table, num_instrs, "inter.asm");

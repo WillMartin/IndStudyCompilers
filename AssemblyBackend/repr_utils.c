@@ -79,6 +79,30 @@ const char *repr_op_code(eOPCode op_code)
     const char *const_repr;
     switch (op_code)
     {
+        case NOP:
+            const_repr = NOP_INSTR;
+            break;
+        case GOTO:
+            const_repr = JMP_INSTR;
+            break;
+        case EQ:
+            const_repr = EQ_INSTR;
+            break;
+        case NEQ:
+            const_repr = NEQ_INSTR;
+            break;
+        case LT:
+            const_repr = LT_INSTR;
+            break;
+        case GT:
+            const_repr = GT_INSTR;
+            break;
+        case LEQ:
+            const_repr = LEQ_INSTR;
+            break;
+        case GEQ:
+            const_repr = GEQ_INSTR;
+            break;
         case ASSIGN:
             const_repr = MOVE_INSTR;
             break;

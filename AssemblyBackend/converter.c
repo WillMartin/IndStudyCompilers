@@ -30,6 +30,16 @@ int get_byte_size(eType type)
     return size;
 }
 
+void write_label(Instruction *instr)
+{
+    fprintf(out_file, "%s:\n", instr->label);
+}
+
+void write_0instr(const char *command)
+{
+    fprintf(out_file, "\t%s\n", command); 
+}
+
 /* Writes out an instruction that requires an x86 command and one argument */
 void write_1instr(const char *command, char *arg)
 {
@@ -49,12 +59,6 @@ void write_2instr(const char *command,
                   char *arg1, char *arg2)
 {
     write_2instr_with_option(command, "", arg1, arg2);
-}
-
-
-void calculate_next_use(GHashTable *address_table)
-{
-
 }
 
 /**
@@ -194,20 +198,24 @@ void dump_reg(Register *reg)
 Register *get_reg_for_arg(Identifier *arg_id, Identifier *result_id, 
                           Identifier *other_id, bool *reserved)
 {
-    // If arg_id is is already in a register, pick it
-    GList *addrs = arg_id->address_descriptor;
-    Register *cur_addr; 
-    for(; addrs != NULL; addrs = addrs->next)
+    // if NULL is passed for arg_id, just find an open register
+    if (arg_id != NULL)
     {
-        return (Register*) addrs->data;
-    }
-
-    // Check to see if there's an empty register
-    for (int i=0; i<NUM_REGISTERS; i++)
-    {
-        if (REGISTERS[i]->variables_held == NULL)
+        // If arg_id is is already in a register, pick it
+        GList *addrs = arg_id->address_descriptor;
+        Register *cur_addr; 
+        for(; addrs != NULL; addrs = addrs->next)
         {
-            return REGISTERS[i];
+            return (Register*) addrs->data;
+        }
+
+        // Check to see if there's an empty register
+        for (int i=0; i<NUM_REGISTERS; i++)
+        {
+            if (REGISTERS[i]->variables_held == NULL)
+            {
+                return REGISTERS[i];
+            }
         }
     }
 
@@ -418,6 +426,7 @@ char *basic_handle_arg(Arg *arg, Register *load_reg)
 /* Handle the case of a unary <instr> and write it out to a file */
 void compile_unary(Instruction *instr)
 {
+    printf("IN COMPILE UNARY\n");
     switch (instr->op_code)
     {
         case ASSIGN:;
@@ -460,13 +469,16 @@ void compile_unary(Instruction *instr)
                 Register *operand_reg = get_reg_for_arg(new_id, new_id, 
                                                         NULL, reserved);
                 ensure_register(new_id, operand_reg);
+
+                // Tell all other registers they no longer have current version
+                remove_id_from_regs(assigned);
                 // No need to dump as we aren't changing any value
                 // Just add the result to this operand's register. Tell the id
                 // that it's been assigned here
                 operand_reg->variables_held = g_list_prepend(
                                                 operand_reg->variables_held,
                                                 assigned);
-                GList *cur_addrs = assigned->address_descriptor;
+
                 assigned->on_stack = false;
                 g_list_free(assigned->address_descriptor);
                 assigned->address_descriptor = NULL;
@@ -484,6 +496,155 @@ void compile_unary(Instruction *instr)
     }
 }
 
+void compile_cond(Instruction *instr)
+{
+    char *arg1_repr, *arg2_repr;
+    // cmp the two args. The first one can't be a constant
+    if (instr->arg1->type == CONST && instr->arg2->type != CONST)
+    {
+        arg1_repr = repr_arg(instr->arg2);
+        arg2_repr = repr_arg(instr->arg1);
+    }
+    else if (instr->arg1->type == CONST && instr->arg2->type == CONST)
+    {
+        bool reserved_regs[6] = {0};
+        // Get a register for the first constant
+        Register *reg = get_reg_for_arg(NULL, NULL, NULL, reserved_regs);
+        dump_reg(reg);
+
+        char *reg_repr = repr_reg(reg); 
+        char *const_arg_repr = repr_const(instr->arg1->const_val);
+        write_2instr_with_option(MOVE_INSTR, DWORD_OPTION, 
+                                 reg_repr, const_arg_repr);
+        free(const_arg_repr);
+        arg1_repr = reg_repr;
+        arg2_repr = repr_arg(instr->arg2);
+    }
+    // Incluse case when arg2 == constant buut arg1 isn't
+    else
+    {
+        arg1_repr = repr_arg(instr->arg1);
+        arg2_repr = repr_arg(instr->arg2);
+    }
+
+    write_2instr(REL_INSTR, arg1_repr, arg2_repr);
+    free(arg1_repr);
+    free(arg2_repr);
+
+    // And then jump appropriately
+    const char *op_code = repr_op_code(instr->op_code);
+    write_1instr(op_code, instr->goto_addr->label);
+}
+
+void compile_goto(Instruction *instr)
+{
+    write_1instr(JMP_INSTR, instr->goto_addr->label);
+}
+
+void compile_nop(Instruction *instr)
+{
+    write_0instr(repr_op_code(NOP));
+}
+
+void compile_binary(Instruction *instr)
+{
+    printf("BINARY INSTRUCTION\n");
+    print_instr(instr);
+    Identifier *result = instr->result;
+    // -1->can't reuse result reg, 0->arg1==result, 1->arg2==result
+    int reg_to_add = -1;
+
+    assert(instr->arg1 != NULL);
+    if (instr->arg1->type == IDENT && 
+        instr->arg1->ident_val == result)
+    {
+        reg_to_add = 0;
+    }
+
+    // At the moment ASSIGN is the only unary operator and it's handled above.
+    assert(instr->arg2 != NULL);
+    // the second arg could be NULL (assignment operator)
+    if (reg_to_add != -1
+        && instr->arg2->type == IDENT 
+        && instr->arg2->ident_val == result)
+    {
+        reg_to_add = 1;
+    }
+
+    bool reserved_regs[6] = {0};
+    // Get a register for the result
+    Register *result_reg = get_reg_for_arg(result, result, 
+                                           NULL, reserved_regs);
+    ensure_register(instr->result, result_reg);
+
+    //print_registers(registers, NUM_REGISTERS);
+    reserved_regs[get_index_for_reg(result_reg)] = true;
+
+    // Repr of the arg which will opped to the result reg.
+    char *op_arg_repr;
+    char *result_repr = repr_reg(result_reg);
+    printf("REG TO ADD %d\n", reg_to_add);
+    switch (reg_to_add)
+    {
+        case -1:;
+            // Load the first arg into the result reg and then op the 
+            // other register
+
+            // If it's a constant then we have to load it with the correct 
+            // option
+            if (instr->arg1->type == CONST)
+            {
+                // Free up the register so we can throw the constant in
+                dump_reg(result_reg);
+                char *const_arg = repr_const(instr->arg1->const_val);
+                write_2instr_with_option(MOVE_INSTR, DWORD_OPTION, 
+                                         result_repr, const_arg);
+                free(const_arg);
+            }
+            else
+            {
+                // This does a bit of redundant work but it should be fine
+                // Load the operand into the result reg. (something will
+                // be added/mult'd/etc. soon
+                // Ensure does any loading we might need to do.
+                ensure_register(instr->arg1->ident_val, result_reg);
+            }
+
+            op_arg_repr = repr_arg(instr->arg2);
+            break;
+        case 0:
+            // The first argument is already in result reg just add second
+            op_arg_repr = repr_arg(instr->arg2);
+            break;
+        case 1:
+            // The second argument is already in result reg just add first
+            op_arg_repr = repr_arg(instr->arg1);
+            break;
+        default:
+            assert(false);
+    }
+    
+    // Fix result reg:
+    // 1) Update result's reg so that it now only contains the result id 
+    // 2) Clear everything from result's descriptor, invalidate memory loc
+    // 3) Remove this register from every other variable 
+
+    // (1) & (3)
+    dump_reg_with_reserve(result_reg, result);
+    // Now done in reserve
+    //result_reg->variables_held = g_list_prepend(result_reg->variables_held, result);
+    // (2)
+    g_list_free(result->address_descriptor); 
+    result->address_descriptor = NULL;
+    result->address_descriptor = g_list_prepend(result->address_descriptor, result_reg);
+    result->on_stack = false;
+
+    write_2instr(repr_op_code(instr->op_code), result_repr,
+                 op_arg_repr);
+    free(result_repr);
+    free(op_arg_repr);
+}
+
 /* Compiles an instruction list using a basic register balancing scheme and
     limited out-writing. */
 void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
@@ -494,109 +655,35 @@ void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
         // Check to see if either of the arguments is the result symbol
         Instruction *cur_instr = get_instr(instr_list, num_instrs, i);
 
+        // Check whether we need a label
+        if (cur_instr->label != NULL)
+        {
+            write_label(cur_instr);
+        }
+
         // Handle assign seperately
         if (cur_instr->op_code == ASSIGN)
         {
-            printf("UNARY\n");
             compile_unary(cur_instr); 
             continue;
         }
-
-        Identifier *result = cur_instr->result;
-        // -1->can't reuse result reg, 0->arg1==result, 1->arg2==result
-        int reg_to_add = -1;
-
-        assert(cur_instr->arg1 != NULL);
-        if (cur_instr->arg1->type == IDENT && 
-            cur_instr->arg1->ident_val == result)
+        else if (cur_instr->op_code == GOTO)
         {
-            reg_to_add = 0;
+            compile_goto(cur_instr);
+        } 
+        else if (is_relative_op(cur_instr->op_code))
+        {
+            compile_cond(cur_instr);
+        }
+        else if (cur_instr->op_code == NOP)
+        {
+            compile_nop(cur_instr);
+        }
+        else
+        {
+            compile_binary(cur_instr);
         }
 
-        // At the moment ASSIGN is the only unary operator and it's handled above.
-        assert(cur_instr->arg2 != NULL);
-        // the second arg could be NULL (assignment operator)
-        if (reg_to_add != -1
-            && cur_instr->arg2->type == IDENT 
-            && cur_instr->arg2->ident_val == result)
-        {
-            reg_to_add = 1;
-        }
-
-        bool reserved_regs[6] = {0};
-        // Get a register for the result
-        Register *result_reg = get_reg_for_arg(result, result, 
-                                               NULL, reserved_regs);
-        ensure_register(cur_instr->result, result_reg);
-
-        //print_registers(registers, NUM_REGISTERS);
-        reserved_regs[get_index_for_reg(result_reg)] = true;
-
-        // Repr of the arg which will opped to the result reg.
-        char *op_arg_repr;
-        char *result_repr = repr_reg(result_reg);
-        switch (reg_to_add)
-        {
-            case -1:;
-                printf("CASE -1\n");
-                // Load the first arg into the result reg and then op the 
-                // other register
-
-                // If it's a constant then we have to load it with the correct 
-                // option
-                if (cur_instr->arg1->type == CONST)
-                {
-                    // Free up the register so we can throw the constant in
-                    dump_reg(result_reg);
-                    char *const_arg = repr_const(cur_instr->arg1->const_val);
-                    write_2instr_with_option(MOVE_INSTR, DWORD_OPTION, 
-                                             result_repr, const_arg);
-                    free(const_arg);
-                }
-                else
-                {
-                    // This does a bit of redundant work but it should be fine
-                    // Load the operand into the result reg. (something will
-                    // be added/mult'd/etc. soon
-                    // Ensure does any loading we might need to do.
-                    ensure_register(cur_instr->arg1->ident_val, result_reg);
-                }
-
-                op_arg_repr = repr_arg(cur_instr->arg2);
-                break;
-            case 0:
-                printf("CASE 0\n");
-                // The first argument is already in result reg just add second
-                op_arg_repr = repr_arg(cur_instr->arg2);
-                break;
-            case 1:
-                printf("CASE 1\n");
-                // The second argument is already in result reg just add first
-                op_arg_repr = repr_arg(cur_instr->arg1);
-                break;
-            default:
-                assert(false);
-        }
-        
-        // Fix result reg:
-        // 1) Update result's reg so that it now only contains the result id 
-        // 2) Clear everything from result's descriptor, invalidate memory loc
-        // 3) Remove this register from every other variable 
-
-        // (1) & (3)
-        dump_reg_with_reserve(result_reg, result);
-        // Now done in reserve
-        //result_reg->variables_held = g_list_prepend(result_reg->variables_held, result);
-        // (2)
-        g_list_free(result->address_descriptor); 
-        result->address_descriptor = NULL;
-        result->address_descriptor = g_list_prepend(result->address_descriptor, result_reg);
-        result->on_stack = false;
-
-        write_2instr(repr_op_code(cur_instr->op_code), result_repr,
-                     op_arg_repr);
-        free(result_repr);
-        free(op_arg_repr);
     }
 }
 

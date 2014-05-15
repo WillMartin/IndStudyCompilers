@@ -85,7 +85,6 @@ char *get_arg_repr(Arg *arg)
     return repr;
 }
 
-// Helper for printing
 bool is_relative_op(eOPCode op_code)
 {
     if (op_code == EQ || op_code == NEQ ||
@@ -105,8 +104,8 @@ void print_instr(Instruction *instr)
     arg2_repr = get_arg_repr(instr->arg2);
     if (is_relative_op(instr->op_code))
     {
-        printf("IF %s %s %s-> GOTO INSTR\n", arg1_repr,
-               OP_CODE_REPRS[instr->op_code], arg2_repr);
+        printf("IF %s %s %s-> GOTO %s\n", arg1_repr,
+               OP_CODE_REPRS[instr->op_code], arg2_repr, instr->goto_addr->label);
     }
     else if (instr->op_code == GOTO) 
     { 
@@ -291,7 +290,7 @@ GList *make_list(int instr_idx)
 char *get_next_label()
 {
     char *label = malloc(5);
-    sprintf(label, "l%d", NEXT_LABEL);
+    sprintf(label, ".l%d", NEXT_LABEL);
     NEXT_LABEL += 1;
     return label;
 
@@ -301,6 +300,8 @@ char *get_next_label()
     as the target jump for each instruction indexed by <list> */
 void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_idx)
 {
+    printf("BACK PATCHING %d into\n", instr_idx);
+    print_list(list);
     Instruction *op_instr = get_instr(instr_list, num_instrs, instr_idx);
     assert(op_instr != NULL);
 

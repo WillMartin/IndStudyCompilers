@@ -16,6 +16,7 @@ typedef struct Register
 
 char *repr_reg(Register *reg);
 GList *remove_reg_from_addrs(GList *addrs, Register *reg);
+void remove_id_from_regs(Identifier *id);
 void print_registers(Register **regs, int num_regs);
 void print_register_state(Register *reg);
 #endif

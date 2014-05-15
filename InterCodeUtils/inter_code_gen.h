@@ -88,6 +88,7 @@ typedef struct Instruction
     char *label;
 } Instruction;
 
+bool is_relative_op(eOPCode op_code);
 
 GPtrArray *init_instr_list();
 void add_instr(GPtrArray *instr_list, int *num_instrs, Instruction* instr);

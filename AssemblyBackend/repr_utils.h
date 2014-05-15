@@ -13,6 +13,17 @@ static const char *SUB_INSTR = "sub";
 static const char *ADD_INSTR = "add";
 static const char *MULT_INSTR = "imul";
 
+static const char *REL_INSTR = "cmp";
+static const char *JMP_INSTR = "jmp";
+static const char *EQ_INSTR = "je";
+static const char *NEQ_INSTR = "jne";
+static const char *LT_INSTR = "jl";
+static const char *GT_INSTR = "jg";
+static const char *LEQ_INSTR = "jle";
+static const char *GEQ_INSTR = "jge";
+
+static const char  *NOP_INSTR = "NOP";
+
 char *repr_addr_ind(char *reg);
 char *repr_addr_mult(char *reg, int fact);
 char *repr_addr_add(char *reg, int offset);

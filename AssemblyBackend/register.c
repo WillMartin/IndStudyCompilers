@@ -29,6 +29,33 @@ GList *remove_reg_from_addrs(GList *addrs, Register *reg)
     return NULL;
 }
 
+/* Deletes id from the given register */
+void remove_id_from_regs(Identifier *id)
+{
+    GList *addrs = id->address_descriptor;
+
+    // Check all registers it's in
+    for (; addrs!=NULL; addrs=addrs->next)
+    {
+        Register *cur_reg = addrs->data;
+        // And then remove it from the register
+        GList *vars_held = cur_reg->variables_held;
+        GList *vars_head = vars_held;
+
+        for (; vars_held!=NULL; vars_held=vars_held->next)
+        {
+            Identifier *cur_id = vars_held->data;
+            if (cur_id == id)
+            {
+                // Remove the current link from the chain
+                cur_reg->variables_held = g_list_delete_link(vars_head, vars_held);
+                break;
+            }
+        }
+        
+    }
+}
+
 /* Debug method to display <reg> in xml-ish fashion */
 void print_register_state(Register *reg)
 {
