@@ -145,6 +145,43 @@ void print_instr_list(GPtrArray *instr_list, int num_instrs)
     }
 }
 
+void *add_action_to_instr(Instruction *instr, Action *act)
+{
+    instr->actions = g_list_prepend(instr->actions, act);
+}
+
+/* Use to require all instrs in range to have associated actions of type <type>.
+   Up to but not including e_id.
+   E.g. when in a while loop all instructions should have their argument vars
+        forced onto the stack */
+GList *add_action_to_instr_range(GPtrArray *instr_list, int num_instrs, 
+                                 int s_id, int e_id, eActionType type)
+{
+    GList *actions = NULL;
+    for (s_id; s_id<e_id; s_id++)
+    {
+
+        Instruction *cur_instr = get_instr(instr_list, num_instrs, s_id);
+
+        if (cur_instr->arg1 != NULL && cur_instr->arg1->type == IDENT)
+        {
+            Action *arg1_action = malloc(sizeof(Action)); 
+            arg1_action->type = type;
+            arg1_action->id = cur_instr->arg1->ident_val;
+            actions = g_list_prepend(actions, arg1_action);
+        }
+
+        if (cur_instr->arg2 != NULL && cur_instr->arg2->type == IDENT)
+        {
+            Action *arg2_action = malloc(sizeof(Action)); 
+            arg2_action->type = type;
+            arg2_action->id = cur_instr->arg2->ident_val;
+            actions = g_list_prepend(actions, arg2_action);
+        }
+    }
+    return actions;
+}
+
 Instruction *init_base_instr(eOPCode op_code, Arg *arg1, Arg *arg2,
                               Identifier *result, Instruction *goto_addr)
 {
@@ -155,6 +192,7 @@ Instruction *init_base_instr(eOPCode op_code, Arg *arg1, Arg *arg2,
     instr->result = result;
     instr->goto_addr = goto_addr;
     instr->label = NULL;
+    instr->actions = NULL;
     return instr;
 }
 

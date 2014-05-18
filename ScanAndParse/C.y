@@ -107,9 +107,21 @@ iteration_statement:
                   add_instr(instr_list, &num_instrs, nop);
                   back_patch(instr_list, num_instrs, $4->false_list, $8);
 
+                  // Add force stack actions to make sure that there will always be 
+                  // a current version that can be accessed for the while loop.
+                  GList *actions = add_action_to_instr_range(instr_list, 
+                                            num_instrs, $2, $6, FORCE_ID_STACK);
+                  Instruction *lock_instr = get_instr(instr_list, num_instrs, $2);
+                  lock_instr->actions = merge_lists(actions, lock_instr->actions);
+
                   // Don't forget to jump back to the top
                   GList *jump_list = make_list($8-1);
                   back_patch(instr_list, num_instrs, jump_list, $2);
+
+                  // And then can free everything back up on the NOP
+                  actions = add_action_to_instr_range(instr_list, num_instrs, 
+                                                   $2, $6, RELEASE_ID_STACK);
+                  nop->actions = actions;
               }
 
 compound_statement:
@@ -350,6 +362,8 @@ declaration:
                   // For now allocate everything to the stack
                   id->offset = stack_offset;
                   stack_offset += get_byte_size($1);
+                  id->on_stack = false;
+                  id->force_on_stack = false;
                   put_identifier(symbol_table, id);
 
                   // If it's a boolean we have to do some alternative work

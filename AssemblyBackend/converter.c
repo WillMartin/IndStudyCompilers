@@ -122,6 +122,18 @@ void init_registers()
     REGISTERS[5]->repr = "edi";
 }
 
+void move_id_to_stack(char *from_loc, Identifier *id)
+{
+    printf("HERE for id %s", id->symbol);
+    char *esp_repr = repr_reg(ESP_REGISTER);
+    char *added_repr= repr_addr_add(esp_repr, id->offset);
+    char *result_loc = repr_addr_ind(added_repr);
+    write_2instr(MOVE_INSTR, result_loc, from_loc);
+    free(esp_repr);
+    free(added_repr);
+    free(result_loc);
+}
+
 /* Clears all variables except <reserved_id> stored in the passed <reg> 
    Handy to dump everything except one variable so that we don't do 
    unnecessary dumps on saves. Pass NULL for no removal. */
@@ -189,6 +201,18 @@ void dump_reg(Register *reg)
 }
 
 
+/* Finds and returns a register if the ID is current in any,
+    else returns NULL */
+Register *get_current_reg(Identifier *id)
+{
+    GList *addrs = id->address_descriptor;
+    Register *cur_addr; 
+    for(; addrs != NULL; addrs = addrs->next)
+    {
+        return (Register*) addrs->data;
+    }
+    return NULL;
+}
 
 // For ids being used as arguments in operations
 // From pg. 547 - Not the most efficient but hopefully readable
@@ -202,12 +226,8 @@ Register *get_reg_for_arg(Identifier *arg_id, Identifier *result_id,
     if (arg_id != NULL)
     {
         // If arg_id is is already in a register, pick it
-        GList *addrs = arg_id->address_descriptor;
-        Register *cur_addr; 
-        for(; addrs != NULL; addrs = addrs->next)
-        {
-            return (Register*) addrs->data;
-        }
+        Register *cur_reg = get_current_reg(arg_id);
+        if (cur_reg != NULL) { return cur_reg; }
 
         // Check to see if there's an empty register
         for (int i=0; i<NUM_REGISTERS; i++)
@@ -347,15 +367,19 @@ void ensure_register(Identifier *id, Register* load_reg)
     // Check to see if it's already loaded
     GList *arg_addrs = id->address_descriptor;
     Register *alt_reg = NULL;
-    for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
+    // Don't allow register loading if we require it to be on the stack
+    if (!id->force_on_stack)
     {
-        if (arg_addrs->data == load_reg)
+        for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
         {
-            return;
-        }
-        else
-        {
-            alt_reg = arg_addrs->data;
+            if (arg_addrs->data == load_reg)
+            {
+                return;
+            }
+            else
+            {
+                alt_reg = arg_addrs->data;
+            }
         }
     }
    
@@ -372,6 +396,7 @@ void ensure_register(Identifier *id, Register* load_reg)
         // In this case x should be copied and then we add 5. So we request
         // a register for t0 but then ensure x into it.
 
+        // Initial concerns:
         // If this happens then we called ensure register on a register
         // that didn't contain the value, but another did. This seems to indicate
         // something is going wrong with get_reg.
@@ -440,27 +465,51 @@ void compile_unary(Instruction *instr)
             // for the result 
             if (operand->type == CONST)
             {
-                // Variable's value is now only here.
-                Register *result_reg = get_reg_for_arg(assigned, assigned,
-                                                       NULL, reserved);
-                ensure_register(assigned, result_reg);
-                // Clear out everything from the register except the assignment
-                // we just made
-                dump_reg_with_reserve(result_reg, assigned);
-                // Now tell the variable it's only place is in the register
-                g_list_free(assigned->address_descriptor);
-                assigned->address_descriptor = NULL;
-                assigned->address_descriptor = g_list_prepend(
-                                                    assigned->address_descriptor, 
-                                                    result_reg);
-                assigned->on_stack = false;
+                // If we have to use the stack, don't worry about doing complicated
+                // register operations. Just move a const to the stack
+                printf("ASSIGNED? %s", assigned->symbol);
+                if (assigned->force_on_stack)
+                {
+                    printf("\t BUT NOT FORCE\n");
+                    g_list_free(assigned->address_descriptor);
+                    assigned->address_descriptor = NULL;
+                    assigned->on_stack = true;
 
-                char *result_repr = repr_reg(result_reg);
-                char *const_repr = repr_const(operand->const_val);
-                // And finally do the load
-                write_2instr(MOVE_INSTR, result_repr, const_repr);
-                free(result_repr);
-                free(const_repr);
+                    char *esp_repr = repr_reg(ESP_REGISTER);
+                    char *added_repr= repr_addr_add(esp_repr, assigned->offset);
+                    char *result_loc = repr_addr_ind(added_repr);
+                    char *const_repr = repr_const(operand->const_val);
+                    // And finally do the load
+                    write_2instr(MOVE_INSTR, result_loc, const_repr);
+                    free(esp_repr);
+                    free(added_repr);
+                    free(result_loc);
+                    free(const_repr);
+                }    
+                else
+                {
+                    // Variable's value is now only here.
+                    Register *result_reg = get_reg_for_arg(assigned, assigned,
+                                                           NULL, reserved);
+                    ensure_register(assigned, result_reg);
+                    // Clear out everything from the register except the assignment
+                    // we just made
+                    dump_reg_with_reserve(result_reg, assigned);
+                    // Now tell the variable it's only place is in the register
+                    g_list_free(assigned->address_descriptor);
+                    assigned->address_descriptor = NULL;
+                    assigned->address_descriptor = g_list_prepend(
+                                                        assigned->address_descriptor, 
+                                                        result_reg);
+                    assigned->on_stack = false;
+
+                    char *result_repr = repr_reg(result_reg);
+                    char *const_repr = repr_const(operand->const_val);
+                    // And finally do the load
+                    write_2instr(MOVE_INSTR, result_repr, const_repr);
+                    free(result_repr);
+                    free(const_repr);
+                }
             }
             else if (operand->type == IDENT)
             {
@@ -486,6 +535,14 @@ void compile_unary(Instruction *instr)
                                                     assigned->address_descriptor, 
                                                     operand_reg);
                 // Note: no direct load instr needed
+                // Test whether we need to dump to memory 
+                if (assigned->force_on_stack)
+                {
+                    assigned->on_stack = true;    
+                    char *rrepr = repr_reg(operand_reg);
+                    move_id_to_stack(rrepr, assigned);
+                    free(rrepr);
+                }
             }
             else { assert(false); }
             break;
@@ -494,6 +551,7 @@ void compile_unary(Instruction *instr)
             assert(false);
             break;
     }
+
 }
 
 void compile_cond(Instruction *instr)
@@ -520,7 +578,7 @@ void compile_cond(Instruction *instr)
         arg1_repr = reg_repr;
         arg2_repr = repr_arg(instr->arg2);
     }
-    // Incluse case when arg2 == constant buut arg1 isn't
+    // Includes case when arg2 == constant but arg1 isn't
     else
     {
         arg1_repr = repr_arg(instr->arg1);
@@ -587,6 +645,7 @@ void compile_binary(Instruction *instr)
     switch (reg_to_add)
     {
         case -1:;
+            printf("CASE 1\n");
             // Load the first arg into the result reg and then op the 
             // other register
 
@@ -607,16 +666,21 @@ void compile_binary(Instruction *instr)
                 // Load the operand into the result reg. (something will
                 // be added/mult'd/etc. soon
                 // Ensure does any loading we might need to do.
+                printf("ENSURING REGISTER FOR %s\n", instr->arg1->ident_val->symbol);
+                //fprintf(out_file, "TEST\n");
                 ensure_register(instr->arg1->ident_val, result_reg);
+                //fprintf(out_file, "AFTER TEST\n");
             }
 
             op_arg_repr = repr_arg(instr->arg2);
             break;
         case 0:
+            printf("CASE 2\n");
             // The first argument is already in result reg just add second
             op_arg_repr = repr_arg(instr->arg2);
             break;
         case 1:
+            printf("CASE 3\n");
             // The second argument is already in result reg just add first
             op_arg_repr = repr_arg(instr->arg1);
             break;
@@ -641,8 +705,56 @@ void compile_binary(Instruction *instr)
 
     write_2instr(repr_op_code(instr->op_code), result_repr,
                  op_arg_repr);
+
+    // And finally check if we need to push it back onto the stack
+    if (result->force_on_stack)
+    {
+        result->on_stack = true;    
+        move_id_to_stack(result_repr, result);
+    }
+
     free(result_repr);
     free(op_arg_repr);
+}
+
+void perform_instr_actions(Instruction *instr)
+{
+    GList *instr_acts = instr->actions;
+    for (; instr_acts!=NULL; instr_acts=instr_acts->next)
+    {
+        Action *cur_action = instr_acts->data;
+        Identifier *action_id = cur_action->id;
+        switch (cur_action->type)
+        {
+            case FORCE_ID_STACK:
+                printf("FORCING %s on stack\n", action_id->symbol);
+                action_id->force_on_stack = true;
+                // Move it to the stack if we can.
+                /* For example in case  
+                   int x = 0;
+                   while (x < 5) { ... }
+                   Then the while will force_on_stack but we need to grab x from 
+                   its stack location
+                */
+                if (!action_id->on_stack)
+                {
+                    Register *cur_reg = get_current_reg(action_id);
+                    assert(cur_reg!=NULL);
+                    char *rrepr = repr_reg(cur_reg);
+                    move_id_to_stack(rrepr, action_id);
+                    free(rrepr);
+                    action_id->on_stack = true;
+                }
+                break;
+            case RELEASE_ID_STACK:
+                printf("Releasing %s on stack\n", action_id->symbol);
+                action_id->force_on_stack = false;
+                break;
+            default:
+                assert(false);
+                break;
+        }
+    }
 }
 
 /* Compiles an instruction list using a basic register balancing scheme and
@@ -655,6 +767,8 @@ void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
         // Check to see if either of the arguments is the result symbol
         Instruction *cur_instr = get_instr(instr_list, num_instrs, i);
 
+        perform_instr_actions(cur_instr);
+
         // Check whether we need a label
         if (cur_instr->label != NULL)
         {
@@ -665,7 +779,6 @@ void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
         if (cur_instr->op_code == ASSIGN)
         {
             compile_unary(cur_instr); 
-            continue;
         }
         else if (cur_instr->op_code == GOTO)
         {

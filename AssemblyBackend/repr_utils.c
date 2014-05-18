@@ -150,15 +150,20 @@ char *repr_arg(Arg *arg)
     else if (arg->type == IDENT)
     {
         Identifier *id = arg->ident_val;
-        // Check to see if it's already in a register - more efficient!
-        // Only one of these will be used.
         Register *reg_loc = NULL; 
-        GList *arg_addrs = id->address_descriptor;
-        for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
+        // Force it to grab from the stack in this case.
+        if (!id->force_on_stack)
         {
-            reg_loc = arg_addrs->data;
-            break;
+            // Check to see if it's already in a register - more efficient!
+            // Only one of these will be used.
+            GList *arg_addrs = id->address_descriptor;
+            for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
+            {
+                reg_loc = arg_addrs->data;
+                break;
+            }
         }
+        printf("IDENT? %s\n", id->symbol);
 
         // Grab it from the register
         if (reg_loc != NULL)
@@ -170,9 +175,14 @@ char *repr_arg(Arg *arg)
         {
             char *stack_base = repr_reg(ESP_REGISTER);
             char *with_offset = repr_addr_add(stack_base, id->offset);
-            repr = repr_addr_ind(with_offset);
+            char *ind_repr = repr_addr_ind(with_offset);
+            // Doesn't hurt to give it the size we're loading since we're only doing ints..
+            repr = malloc(strlen(with_offset) + 10);
+            sprintf(repr, "%s %s", DWORD_OPTION, ind_repr);
+            
             free(stack_base);
             free(with_offset);
+            free(ind_repr);
         }
         // Indicates the variable is neither on the stack nor
         // in a register -> has no representation

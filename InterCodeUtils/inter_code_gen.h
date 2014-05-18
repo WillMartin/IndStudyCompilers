@@ -75,6 +75,18 @@ typedef struct Arg
     GList *false_list;
 } Arg;
 
+typedef enum eActionType
+{
+    FORCE_ID_STACK,
+    RELEASE_ID_STACK,
+} eActionType;
+
+typedef struct Action
+{
+    eActionType type;
+    Identifier *id;
+} Action;
+
 // Represents an instruction as a generic Indirect-Triplet
 typedef struct Instruction
 {
@@ -86,6 +98,9 @@ typedef struct Instruction
     // For jumps
     struct Instruction *goto_addr;
     char *label;
+    // Any other actions that should be done when assembling this instr. For
+    // example locking or unlocking variables. Type: Action
+    GList *actions; 
 } Instruction;
 
 bool is_relative_op(eOPCode op_code);
@@ -100,6 +115,11 @@ Instruction *init_goto_instr(Instruction *goto_addr);
 Instruction *init_cond_instr(eOPCode op_code, Arg *arg1, Arg *arg2, Instruction *goto_addr);
 Instruction *init_assign_instr(Arg *arg1, Identifier *result);
 Instruction *init_nop_instr();
+
+GList *add_action_to_instr_range(GPtrArray *instr_list, int num_instrs, 
+                                 int s_id, int e_id, eActionType type);
+
+void *add_action_to_instr(Instruction *instr, Action *act);
 
 Instruction *gen_additive_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
 Instruction *gen_subtractive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2);

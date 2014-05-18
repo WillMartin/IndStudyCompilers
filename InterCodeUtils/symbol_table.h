@@ -32,10 +32,13 @@ typedef struct Identifier
     char *symbol;
     eType type;
 
-    // This is "its" place on the stack. Should not change!
     bool on_stack; // Whether the most current version is here
-    int offset; // Offset from start of location
-    GList *address_descriptor; // Of type Address
+    // If a current version must be kept on stack and only grabbed from there
+    // primarily for while-loops.
+    bool force_on_stack;
+    // This is "its" place on the stack. Should not change!
+    int offset; 
+    GList *address_descriptor; // Of type Register
 } Identifier; 
 
 GHashTable *init_symbol_table();

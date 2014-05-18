@@ -23,6 +23,8 @@ Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type)
     Identifier *id = malloc(sizeof(Identifier));
     id->symbol = symbol;
     id->type = type;
+    id->force_on_stack = false;
+    id->on_stack = false;
     g_hash_table_insert(sym_table, symbol, id);
     return id;
 }
@@ -33,7 +35,8 @@ Identifier *get_temp_symbol()
     char *sym = malloc(4 * sizeof(char));
     sprintf(sym, "t%d", temp_number);
     id->symbol = sym;
-
+    id->force_on_stack = false;
+    id->on_stack = false;
     temp_number += 1;
     return id;
 }
