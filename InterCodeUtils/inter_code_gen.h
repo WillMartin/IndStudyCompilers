@@ -110,8 +110,9 @@ GPtrArray *init_instr_list();
 void add_instr(GPtrArray *instr_list, int *num_instrs, Instruction* instr);
 Instruction *get_instr(GPtrArray *instr_list, int num_instrs, int index);
 void print_instr_list(GPtrArray *instr_list, int num_instrs);
+void print_instr(Instruction *instr);
 
-Instruction *init_instruction(eOPCode op_code, Arg *arg1, Arg *arg2, Identifier *result);
+Instruction *init_instr(eOPCode op_code, Arg *arg1, Arg *arg2, Identifier *result);
 Instruction *init_goto_instr(Instruction *goto_addr);
 Instruction *init_cond_instr(eOPCode op_code, Arg *arg1, Arg *arg2, Instruction *goto_addr);
 Instruction *init_assign_instr(Arg *arg1, Identifier *result);

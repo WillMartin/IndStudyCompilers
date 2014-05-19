@@ -3,6 +3,7 @@
     /* Declarations: includes, globals */
 #include <stdio.h>
 #include "AssemblyBackend/converter.h"
+#include "InterCodeUtils/optimization.h"    
 #include "InterCodeUtils/symbol_table.h"
 #include "InterCodeUtils/inter_code_gen.h"
     
@@ -513,7 +514,9 @@ int main()
 
     yyparse();
  
-    print_instr_list(instr_list, num_instrs);
+    //print_instr_list(instr_list, num_instrs);
+    GList *block_list = make_blocks(instr_list, num_instrs);
+    print_blocks(instr_list, num_instrs, block_list);
 
     print_symbol_table(symbol_table);
     compile(instr_list, symbol_table, num_instrs, "inter.asm");
