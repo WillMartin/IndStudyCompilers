@@ -123,6 +123,11 @@ void print_instr(Instruction *instr)
         char *label = instr->label != NULL ? instr->label : "";
         printf("%s %s = %s\n", label, result_repr, arg1_repr);
     }
+    else if (instr->op_code == PRINT)
+    {
+        char *label = instr->label != NULL ? instr->label : "";
+        printf("%s PRINT %s\n", label, arg1_repr);
+    }
     else 
     { 
         result_repr = instr->result->symbol; 

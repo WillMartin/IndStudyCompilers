@@ -24,6 +24,7 @@ typedef enum eOPCode
     UMINUS, // unary minus sign
     GOTO,   // unconditional goto
     NOP,    // No-op for ease
+    PRINT,  // Because implementing ids as functions would be a pain
     // Relative operators (Cond. GOTO)
     EQ,
     NEQ,
@@ -35,7 +36,7 @@ typedef enum eOPCode
 
 // For debugging only
 static const char* OP_CODE_REPRS[] = {"=", "+", "CAST", "/", "*", "-", "-(UNARY)",
-                      "GOTO", "NOP", "==", "!=", "<", ">", "<=", ">=" };
+                      "GOTO", "NOP", "PRINT", "==", "!=", "<", ">", "<=", ">=" };
 
 typedef struct Constant
 {

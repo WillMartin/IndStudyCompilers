@@ -61,6 +61,33 @@ void write_2instr(const char *command,
     write_2instr_with_option(command, "", arg1, arg2);
 }
 
+// Only doing integers and booleans
+void print_variable(Identifier *id)
+{
+    char const *fmt;
+    int id_size;
+    switch (id->type)
+    {
+        case INTEGER:
+            fmt = NUM_PRINT;
+            id_size = INT_SIZE;
+            break;
+        case BOOL:
+            fmt = NUM_PRINT;
+            id_size = BOOL_SIZE;
+            break;
+        default:
+            assert(false); 
+            break;
+    }
+    fprintf(out_file, "\t%s %s\n", PUSH_INSTR, repr_ident(id));
+    fprintf(out_file, "\t%s %s\n", PUSH_INSTR, fmt);
+    fprintf(out_file, "\tcall printf\n");
+    char *reg_repr = repr_reg(ESP_REGISTER);
+    fprintf(out_file, "\t%s %s, %d\n", ADD_INSTR, reg_repr, id_size + 4);
+    free(reg_repr);
+}
+
 /**
  *  Make room for local variables
  */
@@ -409,10 +436,11 @@ void ensure_register(Identifier *id, Register* load_reg)
     {
         printf("Loading from stack\n");
         // Now for the actual loading
-        char *load_from_direct = repr_ident(id);            
+        load_from = repr_ident(id);            
+        //char *load_from_direct = repr_ident(id);            
         // Want the value, not the address
-        load_from = repr_addr_ind(load_from_direct);
-        free(load_from_direct);
+        //load_from = repr_addr_ind(load_from_direct);
+        //free(load_from_direct);
     }
 
     // Tell the register its holding the variable
@@ -546,6 +574,9 @@ void compile_unary(Instruction *instr)
             }
             else { assert(false); }
             break;
+        case PRINT:
+            print_variable(instr->arg1->ident_val);
+            break;
         default:
             // Can't happen at the moment
             assert(false);
@@ -557,11 +588,15 @@ void compile_unary(Instruction *instr)
 void compile_cond(Instruction *instr)
 {
     char *arg1_repr, *arg2_repr;
+    // Because we flip order of operands sometimes, keep track
+    bool flipped = false;
     // cmp the two args. The first one can't be a constant
     if (instr->arg1->type == CONST && instr->arg2->type != CONST)
     {
         arg1_repr = repr_arg(instr->arg2);
         arg2_repr = repr_arg(instr->arg1);
+        flipped = true;
+        printf("FLIPPED\n");
     }
     else if (instr->arg1->type == CONST && instr->arg2->type == CONST)
     {
@@ -590,8 +625,17 @@ void compile_cond(Instruction *instr)
     free(arg2_repr);
 
     // And then jump appropriately
-    const char *op_code = repr_op_code(instr->op_code);
-    write_1instr(op_code, instr->goto_addr->label);
+    eOPCode op_code = instr->op_code;
+    if (flipped)
+    {
+        if (op_code == LT)       { op_code = GT;  }
+        else if (op_code == GT)  { op_code = LT;  }
+        else if (op_code == LEQ) { op_code = GEQ; }
+        else if (op_code == GEQ) { op_code = LEQ; }
+    }
+
+    const char *op_code_repr = repr_op_code(op_code);
+    write_1instr(op_code_repr, instr->goto_addr->label);
 }
 
 void compile_goto(Instruction *instr)
@@ -606,8 +650,6 @@ void compile_nop(Instruction *instr)
 
 void compile_binary(Instruction *instr)
 {
-    printf("BINARY INSTRUCTION\n");
-    print_instr(instr);
     Identifier *result = instr->result;
     // -1->can't reuse result reg, 0->arg1==result, 1->arg2==result
     int reg_to_add = -1;
@@ -776,7 +818,8 @@ void basic_compile(GPtrArray *instr_list, GHashTable* symbol_table,
         }
 
         // Handle assign seperately
-        if (cur_instr->op_code == ASSIGN)
+        if (cur_instr->op_code == ASSIGN ||
+            cur_instr->op_code == PRINT)
         {
             compile_unary(cur_instr); 
         }
@@ -934,6 +977,11 @@ void stack_compile(GPtrArray *instr_list, GHashTable* symbol_table,
 /* Write out some header boilerplate */
 void write_header()
 {
+    fprintf(out_file, "extern printf\n");
+    fprintf(out_file, "SECTION .data\n");
+    fprintf(out_file, "\t%s\n", NUM_PRINT_FMT);
+
+
     fprintf(out_file, "SECTION .text\n");
     fprintf(out_file, "\tglobal _start\n");
     fprintf(out_file, "_start:\n");

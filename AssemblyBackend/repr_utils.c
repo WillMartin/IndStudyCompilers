@@ -77,6 +77,7 @@ char *repr_const(Constant *c)
 const char *repr_op_code(eOPCode op_code)
 {
     const char *const_repr;
+    printf("OP CODE? %d\n", op_code);
     switch (op_code)
     {
         case NOP:
@@ -125,12 +126,54 @@ const char *repr_op_code(eOPCode op_code)
 
 // Just get it's address for now, if they want what's 
 // in it the caller can indirect it
-char *repr_ident(Identifier *ident)
+char *repr_ident(Identifier *id)
 {
+    char *repr;
+    Register *reg_loc = NULL; 
+    // Force it to grab from the stack in this case.
+    if (!id->force_on_stack)
+    {
+        // Check to see if it's already in a register - more efficient!
+        // Only one of these will be used.
+        GList *arg_addrs = id->address_descriptor;
+        for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
+        {
+            reg_loc = arg_addrs->data;
+            break;
+        }
+    }
+    printf("IDENT? %s\n", id->symbol);
+
+    // Grab it from the register
+    if (reg_loc != NULL)
+    {
+        repr = repr_reg(reg_loc);
+    }
+    // If the current value held in the stack is current then we're fine
+    else if (id->on_stack)
+    {
+        char *stack_base = repr_reg(ESP_REGISTER);
+        char *with_offset = repr_addr_add(stack_base, id->offset);
+        char *ind_repr = repr_addr_ind(with_offset);
+        // Doesn't hurt to give it the size we're loading since we're only doing ints..
+        repr = malloc(strlen(with_offset) + 10);
+        sprintf(repr, "%s %s", DWORD_OPTION, ind_repr);
+        
+        free(stack_base);
+        free(with_offset);
+        free(ind_repr);
+    }
+    // Indicates the variable is neither on the stack nor
+    // in a register -> has no representation
+    else { assert(false); }
+
+    return repr;
+    /*
     char *esp_repr = repr_reg(ESP_REGISTER);
     char *repr = repr_addr_add(esp_repr, ident->offset);
     free(esp_repr);
     return repr;
+    */
 }
 
 
@@ -149,44 +192,7 @@ char *repr_arg(Arg *arg)
     }
     else if (arg->type == IDENT)
     {
-        Identifier *id = arg->ident_val;
-        Register *reg_loc = NULL; 
-        // Force it to grab from the stack in this case.
-        if (!id->force_on_stack)
-        {
-            // Check to see if it's already in a register - more efficient!
-            // Only one of these will be used.
-            GList *arg_addrs = id->address_descriptor;
-            for (; arg_addrs!=NULL; arg_addrs=arg_addrs->next)
-            {
-                reg_loc = arg_addrs->data;
-                break;
-            }
-        }
-        printf("IDENT? %s\n", id->symbol);
-
-        // Grab it from the register
-        if (reg_loc != NULL)
-        {
-            repr = repr_reg(reg_loc);
-        }
-        // If the current value held in the stack is current then we're fine
-        else if (arg->ident_val->on_stack)
-        {
-            char *stack_base = repr_reg(ESP_REGISTER);
-            char *with_offset = repr_addr_add(stack_base, id->offset);
-            char *ind_repr = repr_addr_ind(with_offset);
-            // Doesn't hurt to give it the size we're loading since we're only doing ints..
-            repr = malloc(strlen(with_offset) + 10);
-            sprintf(repr, "%s %s", DWORD_OPTION, ind_repr);
-            
-            free(stack_base);
-            free(with_offset);
-            free(ind_repr);
-        }
-        // Indicates the variable is neither on the stack nor
-        // in a register -> has no representation
-        else { assert(false); }
+        repr = repr_ident(arg->ident_val);
     }
     else { assert(false); }
     return repr;

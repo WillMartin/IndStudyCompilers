@@ -56,6 +56,7 @@ else        { return ELSE_TOKEN;  }
 while       { return WHILE_TOKEN; }
 true        { return TRUE_TOKEN;  }
 false       { return FALSE_TOKEN; }
+print       { return PRINT_TOKEN; }
 
 \|\|        { return OR_TOKEN;  }
 &&          { return AND_TOKEN; }

@@ -49,7 +49,7 @@ int yyerror(const char *str);
 %token <cval> EQUALITY_TOKEN
 %token <cval> RELATIONAL_TOKEN
 
-%token DOUBLE_TYPE_TOKEN INT_TYPE_TOKEN LONG_TYPE_TOKEN CHAR_TYPE_TOKEN BOOL_TYPE_TOKEN IF_TOKEN ELSE_TOKEN WHILE_TOKEN OR_TOKEN AND_TOKEN TRUE_TOKEN FALSE_TOKEN
+%token DOUBLE_TYPE_TOKEN INT_TYPE_TOKEN LONG_TYPE_TOKEN CHAR_TYPE_TOKEN BOOL_TYPE_TOKEN IF_TOKEN ELSE_TOKEN WHILE_TOKEN OR_TOKEN AND_TOKEN TRUE_TOKEN FALSE_TOKEN PRINT_TOKEN
 
 %nonassoc LOWER_THAN_ELSE 
 %nonassoc ELSE_TOKEN
@@ -143,6 +143,12 @@ block_item:
 
 expression:       
               assignment_expression
+            | PRINT_TOKEN '(' id ')'
+              {
+                  Arg *arg = init_arg(IDENT, $3);
+                  Instruction *instr = init_instr(PRINT, arg, NULL, NULL);
+                  add_instr(instr_list, &num_instrs, instr);
+              }
             ;
 
 goto_place_holder:
