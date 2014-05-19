@@ -11,13 +11,13 @@
 
 typedef struct BasicBlock
 {
-    // Match the instr_list
-    // Up to but not including e_idx
-    int s_idx;
-    int e_idx;
+    // Of Instruction*
+    GList *instrs;
+    // Of BasicBlock*
+    GList *successors;
 } BasicBlock;
 
 GList *make_blocks(GPtrArray *instr_list, int num_instrs);
 void print_blocks(GPtrArray *instr_list, int num_instrs, GList *block_list);
-
+void combine_blocks(GList *block_list, GPtrArray **instr_list, int *num_values);
 #endif  // OPTIMIZATION

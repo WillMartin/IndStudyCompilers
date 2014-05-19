@@ -25,7 +25,6 @@ inter_code_gen.o: InterCodeUtils/symbol_table.h InterCodeUtils/symbol_table.c In
 optimization.o: InterCodeUtils/optimization.h InterCodeUtils/optimization.c InterCodeUtils/symbol_table.h InterCodeUtils/symbol_table.c InterCodeUtils/inter_code_gen.c InterCodeUtils/inter_code_gen.h
 	gcc $(CFLAGS) -c InterCodeUtils/optimization.c InterCodeUtils/symbol_table.c InterCodeUtils/inter_code_gen.c $(WITH_GLIB)
 
-
 converter.o: AssemblyBackend/converter.h AssemblyBackend/converter.c register.o repr_utils.o
 	gcc $(CFLAGS) -c AssemblyBackend/converter.h AssemblyBackend/converter.c register.o repr_utils.o $(WITH_GLIB)
 
@@ -36,4 +35,4 @@ repr_utils.o: AssemblyBackend/repr_utils.h AssemblyBackend/repr_utils.c
 	gcc $(CFLAGS) -c AssemblyBackend/repr_utils.h AssemblyBackend/repr_utils.c $(WITH_GLIB)
 
 clean:
-	rm -f *.o lex.yy.c y.tab.c y.tab.h
+	rm -rf *.o lex.yy.c y.tab.c y.tab.h *.gch
