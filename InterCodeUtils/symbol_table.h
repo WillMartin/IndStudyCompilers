@@ -50,6 +50,7 @@ void print_symbol_table(GHashTable *sym_table);
 
 // Hack together
 GList *get_all_identifiers(GHashTable *sym_table);
+void update_offsets_by_val(GHashTable *sym_table, int offset);
 //TODO
 //GList *get_local_identifiers(SymbolTableList *sym_tab_list);
 

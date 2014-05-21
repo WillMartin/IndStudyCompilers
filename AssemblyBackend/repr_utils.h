@@ -32,5 +32,6 @@ char *repr_real(double x);
 char *repr_const(Constant *c);
 const char *repr_op_code(eOPCode op_code);
 char *repr_ident(Identifier *ident);
+char *repr_stack_from_offset(int offset);
 char *repr_arg(Arg *arg);
 #endif

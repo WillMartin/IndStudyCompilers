@@ -1,5 +1,6 @@
 #include "repr_utils.h"
 
+int CUR_STACK_OFFSET = 0;
 /* Returns a newly malloc'd NASM style indirect addressing of <reg> */
 char *repr_addr_ind(char *reg)
 {
@@ -22,7 +23,8 @@ char *repr_addr_add(char *reg, int offset)
 {
     // Assuming offsets are less than 1,000 in this case
     char *repr = malloc(sizeof(strlen(reg)) + 5);
-    if (offset < 0) { sprintf(repr,"%s-%d", reg, offset); }
+    // -1 is included in the number! Don't need to add it in
+    if (offset < 0) { sprintf(repr,"%s%d", reg, offset); }
     else if (offset > 0) { sprintf(repr,"%s+%d", reg, offset); }
     else { sprintf(repr, "%s", reg); }
 
@@ -123,6 +125,20 @@ const char *repr_op_code(eOPCode op_code)
     return const_repr;
 }
 
+char *repr_stack_from_offset(int offset)
+{
+    char *stack_base = repr_reg(ESP_REGISTER);
+    char *with_offset = repr_addr_add(stack_base, offset);
+    char *ind_repr = repr_addr_ind(with_offset);
+    // Doesn't hurt to give it the size we're loading since we're only doing ints..
+    char *repr = malloc(strlen(with_offset) + 10);
+    sprintf(repr, "%s %s", DWORD_OPTION, ind_repr);
+    
+    free(stack_base);
+    free(with_offset);
+    free(ind_repr);
+    return repr;
+}
 
 // Just get it's address for now, if they want what's 
 // in it the caller can indirect it
@@ -142,7 +158,6 @@ char *repr_ident(Identifier *id)
             break;
         }
     }
-    printf("IDENT? %s\n", id->symbol);
 
     // Grab it from the register
     if (reg_loc != NULL)
@@ -152,28 +167,13 @@ char *repr_ident(Identifier *id)
     // If the current value held in the stack is current then we're fine
     else if (id->on_stack)
     {
-        char *stack_base = repr_reg(ESP_REGISTER);
-        char *with_offset = repr_addr_add(stack_base, id->offset);
-        char *ind_repr = repr_addr_ind(with_offset);
-        // Doesn't hurt to give it the size we're loading since we're only doing ints..
-        repr = malloc(strlen(with_offset) + 10);
-        sprintf(repr, "%s %s", DWORD_OPTION, ind_repr);
-        
-        free(stack_base);
-        free(with_offset);
-        free(ind_repr);
+        repr = repr_stack_from_offset(id->offset + CUR_STACK_OFFSET);
     }
     // Indicates the variable is neither on the stack nor
     // in a register -> has no representation
     else { assert(false); }
 
     return repr;
-    /*
-    char *esp_repr = repr_reg(ESP_REGISTER);
-    char *repr = repr_addr_add(esp_repr, ident->offset);
-    free(esp_repr);
-    return repr;
-    */
 }
 
 

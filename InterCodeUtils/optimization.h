@@ -20,4 +20,12 @@ typedef struct BasicBlock
 GList *make_blocks(GPtrArray *instr_list, int num_instrs);
 void print_blocks(GPtrArray *instr_list, int num_instrs, GList *block_list);
 void combine_blocks(GList *block_list, GPtrArray **instr_list, int *num_values);
+
+
+
+typedef struct DagNode
+{
+    eOPCode op_code;
+} DagNode;
+
 #endif  // OPTIMIZATION

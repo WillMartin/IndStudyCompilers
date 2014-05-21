@@ -104,7 +104,8 @@ void print_instr(Instruction *instr)
     arg2_repr = get_arg_repr(instr->arg2);
     if (is_relative_op(instr->op_code))
     {
-        printf("IF %s %s %s-> GOTO %s\n", arg1_repr,
+        char *label = instr->label != NULL ? instr->label : "";
+        printf("%s IF %s %s %s-> GOTO %s\n", label, arg1_repr,
                OP_CODE_REPRS[instr->op_code], arg2_repr, instr->goto_addr->label);
     }
     else if (instr->op_code == GOTO) 
@@ -357,9 +358,6 @@ void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_id
         Instruction *goto_instr = get_instr(instr_list, num_instrs, cur_idx);
 
         assert(goto_instr != NULL);
-        // Could be cond
-        //assert(goto_instr->op_code == GOTO);
-        //assert(goto_instr->arg1 == NULL);
 
         Arg *arg = init_arg(INSTR, op_instr);
         goto_instr->goto_addr = op_instr;

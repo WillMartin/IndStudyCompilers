@@ -13,6 +13,20 @@ Identifier *get_identifier(GHashTable *sym_table, char* sym)
     return (Identifier*) g_hash_table_lookup(sym_table, sym);
 }
 
+
+/*
+void update_offsets_by_val(GHashTable *sym_table, int offset)
+{
+    Glist *syms = get_all_identifiers(sym_table);
+    for (;syms!=NULL;syms=syms->next)
+    {
+        Identifier *id = syms->data;        
+        id->offset += offset;
+    }
+    g_list_free(syms);
+}
+*/
+
 void put_identifier(GHashTable *sym_table, Identifier *id)
 {
     g_hash_table_insert(sym_table, id->symbol, id);

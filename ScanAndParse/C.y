@@ -111,7 +111,7 @@ iteration_statement:
                   // Add force stack actions to make sure that there will always be 
                   // a current version that can be accessed for the while loop.
                   GList *actions = add_action_to_instr_range(instr_list, 
-                                            num_instrs, $2, $6, FORCE_ID_STACK);
+                                            num_instrs, $2, $8, FORCE_ID_STACK);
                   Instruction *lock_instr = get_instr(instr_list, num_instrs, $2);
                   lock_instr->actions = merge_lists(actions, lock_instr->actions);
 
@@ -121,7 +121,7 @@ iteration_statement:
 
                   // And then can free everything back up on the NOP
                   actions = add_action_to_instr_range(instr_list, num_instrs, 
-                                                   $2, $6, RELEASE_ID_STACK);
+                                                   $2, $8, RELEASE_ID_STACK);
                   nop->actions = actions;
               }
 

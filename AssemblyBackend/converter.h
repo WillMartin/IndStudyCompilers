@@ -30,9 +30,9 @@ static const char *DWORD_OPTION = "DWORD";
 static const char *NUM_PRINT_FMT = "num_print db '%d',10,0";
 static const char *NUM_PRINT = "num_print";
 
-struct Register *REGISTERS[NUM_REGISTERS];
-static int CUR_STACK_OFFSET = 0;
 // EAX, EBX, ECX, EDX, ESI, EDI
+struct Register *REGISTERS[NUM_REGISTERS];
+extern int CUR_STACK_OFFSET;
 
 
 void compile(GPtrArray *instr_list, GHashTable *symbol_table,

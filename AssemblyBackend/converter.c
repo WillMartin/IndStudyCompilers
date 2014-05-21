@@ -1,5 +1,6 @@
 #include "converter.h"
 /* Contains intermediate to assembly code conversion code. */
+// Actually define global
 
 /* Maps types to corresponding byte size. */
 int get_byte_size(eType type)
@@ -61,6 +62,42 @@ void write_2instr(const char *command,
     write_2instr_with_option(command, "", arg1, arg2);
 }
 
+void store_caller_regs()
+{
+    // The first register is the result and the next 3 are not nec. kept
+    // by calling function.
+    // Annoyingly hardcoded  
+    // Also a bit inefficient as we don't know if we actually need to dump them
+    for (int i=0; i<4; i++)
+    {
+        CUR_STACK_OFFSET += 4;
+        Register *cur_reg = REGISTERS[i];
+        char *from_repr = repr_reg(cur_reg);
+        write_1instr(PUSH_INSTR, from_repr);
+        free(from_repr);
+    }
+}
+
+void restore_caller_regs()
+{
+    // Also a bit inefficient as we don't know if we actually need to dump them
+    char *offset_repr = repr_int(16);
+    char *rreg = repr_reg(ESP_REGISTER);
+    write_2instr(ADD_INSTR, rreg, offset_repr);
+    free(rreg);
+    free(offset_repr);
+    for (int i=0; i<4; i++)
+    {
+        CUR_STACK_OFFSET -= 4;
+        Register *cur_reg = REGISTERS[i];
+        char *from_repr = repr_stack_from_offset(-4 * (i + 1));
+        char *to_repr = repr_reg(cur_reg);
+        write_2instr(MOVE_INSTR, to_repr, from_repr);
+        free(from_repr);
+        free(to_repr);
+    }
+}
+
 // Only doing integers and booleans
 void print_variable(Identifier *id)
 {
@@ -80,13 +117,18 @@ void print_variable(Identifier *id)
             assert(false); 
             break;
     }
+
+    store_caller_regs();
+    //fprintf(out_file, "CHECKING OFFSET %s\n", CUR_STACK_OFFSET);
     fprintf(out_file, "\t%s %s\n", PUSH_INSTR, repr_ident(id));
     fprintf(out_file, "\t%s %s\n", PUSH_INSTR, fmt);
     fprintf(out_file, "\tcall printf\n");
     char *reg_repr = repr_reg(ESP_REGISTER);
     fprintf(out_file, "\t%s %s, %d\n", ADD_INSTR, reg_repr, id_size + 4);
     free(reg_repr);
+    restore_caller_regs();
 }
+
 
 /**
  *  Make room for local variables
@@ -99,6 +141,7 @@ void init_stack_variables(GHashTable *address_table)
 
     // Just push uninitialized space onto the stack
     CUR_STACK_OFFSET = 0;
+    int stack_offset = 0;
     int data_size = 0;
     Identifier *cur_id;
     char *esp_repr = repr_reg(REGISTERS[0]);
@@ -109,12 +152,12 @@ void init_stack_variables(GHashTable *address_table)
 
         // Doesn't matter what we push on.
         write_1instr(PUSH_INSTR, esp_repr);
-        CUR_STACK_OFFSET += data_size;
-        printf("VARIABLE %s AT OFFSET %d\n", cur_id->symbol, CUR_STACK_OFFSET);
+        stack_offset += data_size;
+        printf("VARIABLE %s AT OFFSET %d\n", cur_id->symbol, stack_offset);
 
         // No value when initialized
         cur_id->on_stack = false;
-        cur_id->offset = CUR_STACK_OFFSET;
+        cur_id->offset = stack_offset;
         cur_id->address_descriptor = NULL;
     }
     free(esp_repr);
@@ -168,11 +211,12 @@ void dump_reg_with_reserve(Register *reg, Identifier *reserved_id)
 {
     GList *cur_list = reg->variables_held;
     Identifier *cur_id;
+    //fprintf(out_file, "IS CUR LIST NULL for id ",  cur_list==NULL);
     for (; cur_list!=NULL; cur_list=cur_list->next)
     {
         cur_id = cur_list->data;
         // Don't remove the reserved_id
-        if (cur_id == reserved_id)
+        if (cur_id != reserved_id)
         {
 
             // Find out where to store it
@@ -183,6 +227,7 @@ void dump_reg_with_reserve(Register *reg, Identifier *reserved_id)
 
             if (cur_id->address_descriptor->next != NULL)
             {
+                printf("Or are we not dumping because this %s\n", cur_id->symbol);
                 // If it does then we can remove it from here
                 cur_id->address_descriptor = remove_reg_from_addrs(cur_id->address_descriptor, reg);
             }
@@ -193,6 +238,7 @@ void dump_reg_with_reserve(Register *reg, Identifier *reserved_id)
                 char *added_repr= repr_addr_add(esp_repr, cur_id->offset);
                 char *result_loc = repr_addr_ind(added_repr);
                 char *rrepr = repr_reg(reg);
+                printf("DUMPING id: %s!!!!\n", cur_id->symbol);
                 write_2instr(MOVE_INSTR, result_loc, rrepr);
 
                 free(esp_repr);
@@ -451,6 +497,7 @@ void ensure_register(Identifier *id, Register* load_reg)
     // If load_from is NULL then the variable was formally unitialized so 
     // there's nowhere to load it from. Dumping, and ensuring they're correct
     // addr details is enough.
+    //fprintf(out_file, "ENSURE\n");
     if (load_from != NULL)
     {
         char *load_to = repr_reg(load_reg);       
@@ -479,7 +526,6 @@ char *basic_handle_arg(Arg *arg, Register *load_reg)
 /* Handle the case of a unary <instr> and write it out to a file */
 void compile_unary(Instruction *instr)
 {
-    printf("IN COMPILE UNARY\n");
     switch (instr->op_code)
     {
         case ASSIGN:;
@@ -495,7 +541,7 @@ void compile_unary(Instruction *instr)
             {
                 // If we have to use the stack, don't worry about doing complicated
                 // register operations. Just move a const to the stack
-                printf("ASSIGNED? %s", assigned->symbol);
+                printf("ASSIGNED? %s\n", assigned->symbol);
                 if (assigned->force_on_stack)
                 {
                     printf("\t BUT NOT FORCE\n");
@@ -516,10 +562,13 @@ void compile_unary(Instruction *instr)
                 }    
                 else
                 {
+                    print_registers(REGISTERS, NUM_REGISTERS);
+
                     // Variable's value is now only here.
                     Register *result_reg = get_reg_for_arg(assigned, assigned,
                                                            NULL, reserved);
                     ensure_register(assigned, result_reg);
+                    //fprintf(out_file, "BEETWEEN ENSURE AND DUMP\n");
                     // Clear out everything from the register except the assignment
                     // we just made
                     dump_reg_with_reserve(result_reg, assigned);
@@ -533,10 +582,13 @@ void compile_unary(Instruction *instr)
 
                     char *result_repr = repr_reg(result_reg);
                     char *const_repr = repr_const(operand->const_val);
+                    //fprintf(out_file, "HERE for id %s\n", assigned->symbol);
                     // And finally do the load
                     write_2instr(MOVE_INSTR, result_repr, const_repr);
                     free(result_repr);
                     free(const_repr);
+                    printf("NOW KINDA DONE\n");
+                    print_registers(REGISTERS, NUM_REGISTERS);
                 }
             }
             else if (operand->type == IDENT)
@@ -708,7 +760,7 @@ void compile_binary(Instruction *instr)
                 // Load the operand into the result reg. (something will
                 // be added/mult'd/etc. soon
                 // Ensure does any loading we might need to do.
-                printf("ENSURING REGISTER FOR %s\n", instr->arg1->ident_val->symbol);
+                //printf("ENSURING REGISTER FOR %s\n", instr->arg1->ident_val->symbol);
                 //fprintf(out_file, "TEST\n");
                 ensure_register(instr->arg1->ident_val, result_reg);
                 //fprintf(out_file, "AFTER TEST\n");
@@ -781,11 +833,16 @@ void perform_instr_actions(Instruction *instr)
                 if (!action_id->on_stack)
                 {
                     Register *cur_reg = get_current_reg(action_id);
-                    assert(cur_reg!=NULL);
-                    char *rrepr = repr_reg(cur_reg);
-                    move_id_to_stack(rrepr, action_id);
-                    free(rrepr);
-                    action_id->on_stack = true;
+                    // if cur_reg==NULL then it's a value initialized in the loop.
+                    // We're forcing those on the stack too 
+                    //assert(cur_reg!=NULL);
+                    if (cur_reg != NULL)
+                    {
+                        char *rrepr = repr_reg(cur_reg);
+                        move_id_to_stack(rrepr, action_id);
+                        free(rrepr);
+                        action_id->on_stack = true;
+                    }
                 }
                 break;
             case RELEASE_ID_STACK:
@@ -1024,6 +1081,7 @@ void compile(GPtrArray *instr_list, GHashTable* symbol_table,
     init_registers();
     write_header();
     init_stack_variables(symbol_table);
+    printf("CUR STACK %d\n", CUR_STACK_OFFSET);
     //stack_compile(instr_list, symbol_table, num_instrs, file);
     basic_compile(instr_list, symbol_table, num_instrs);
     write_exit();
