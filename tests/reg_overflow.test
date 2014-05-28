@@ -1,0 +1,39 @@
+{
+    int q=1;
+    int w=2;
+    int e=3;
+    int r=4;
+    int t=5;
+    int y=6;
+    int u=7;
+    int i=8;
+    int o=9;
+    int p=11;
+
+    while(q < 15)
+    {
+        q = q + 1;
+        // Just use them
+        w=2;
+        e=3;
+        r=4;
+        t=5;
+        y=6;
+        u=7;
+        i=8;
+        o=9;
+        p=10;
+    }
+
+    q = 1;
+    print(q);
+    print(w);
+    print(e);
+    print(r);
+    print(t);
+    print(y);
+    print(u);
+    print(i);
+    print(o);
+    print(p);
+}

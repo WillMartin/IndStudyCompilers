@@ -1,0 +1,12 @@
+{
+    int n = 12;
+    int prod = 1;
+    while (n>0)
+    {
+        print(prod);
+        print(n);
+        prod = prod * n;  
+        n = n - 1;
+    }
+    print(prod);
+}

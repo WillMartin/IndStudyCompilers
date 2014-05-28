@@ -516,11 +516,21 @@ int main()
  
     //print_instr_list(instr_list, num_instrs);
     GList *block_list = make_blocks(instr_list, num_instrs);
-    print_blocks(instr_list, num_instrs, block_list);
+    print_blocks(num_instrs, block_list);
+    // Just for first block
+    DagBlock *dag = generate_dag(block_list->data);
+    print_dag(dag);
+    GList *new_instrs = compile_dag(NULL, dag);
+    for (; new_instrs!=NULL; new_instrs=new_instrs->next)
+    {
+        printf("NEW INSTR %d\n", ((Instruction*)new_instrs->data)->op_code);
+        print_instr(new_instrs->data);
+    }
+
     GPtrArray *new_instr_list;
     int new_num_instrs;
-    combine_blocks(block_list, &new_instr_list, &new_num_instrs);
-    print_instr_list(new_instr_list, num_instrs);
-    //print_symbol_table(symbol_table);
-    compile(new_instr_list, symbol_table, new_num_instrs, "inter.asm");
+    //combine_blocks(block_list, &new_instr_list, &new_num_instrs);
+    //print_instr_list(new_instr_list, num_instrs);
+    //compile(new_instr_list, symbol_table, new_num_instrs, "inter.asm");
+    //block_list = NULL;
 } 

@@ -32,11 +32,12 @@ typedef enum eOPCode
     GT,
     LEQ,
     GEQ,
+    NONE, // For dag nodes with init values
 } eOPCode;
 
 // For debugging only
 static const char* OP_CODE_REPRS[] = {"=", "+", "CAST", "/", "*", "-", "-(UNARY)",
-                      "GOTO", "NOP", "PRINT", "==", "!=", "<", ">", "<=", ">=" };
+                      "GOTO", "NOP", "PRINT", "==", "!=", "<", ">", "<=", ">=", "NONE" };
 
 typedef struct Constant
 {

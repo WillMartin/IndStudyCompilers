@@ -120,12 +120,14 @@ void print_variable(Identifier *id)
 
     store_caller_regs();
     //fprintf(out_file, "CHECKING OFFSET %s\n", CUR_STACK_OFFSET);
-    fprintf(out_file, "\t%s %s\n", PUSH_INSTR, repr_ident(id));
+    char *ident_repr = repr_ident(id);
+    fprintf(out_file, "\t%s %s\n", PUSH_INSTR, ident_repr);
     fprintf(out_file, "\t%s %s\n", PUSH_INSTR, fmt);
     fprintf(out_file, "\tcall printf\n");
     char *reg_repr = repr_reg(ESP_REGISTER);
     fprintf(out_file, "\t%s %s, %d\n", ADD_INSTR, reg_repr, id_size + 4);
     free(reg_repr);
+    free(ident_repr);
     restore_caller_regs();
 }
 
