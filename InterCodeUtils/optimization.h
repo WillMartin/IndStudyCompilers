@@ -28,6 +28,7 @@ typedef struct DagBlock
 
 GList *make_blocks(GPtrArray *instr_list, int num_instrs);
 void print_blocks(int num_instrs, GList *block_list);
+void print_block(BasicBlock *block);
 void combine_blocks(GList *block_list, GPtrArray **instr_list, int *num_values);
 
 typedef struct DagNode
@@ -50,7 +51,8 @@ typedef struct DagNode
 
 DagBlock *generate_dag(BasicBlock *block);
 void print_dag(DagBlock *dag);
-// TODO change return type
-GList *compile_dag(BasicBlock *block, DagBlock *dag);
+BasicBlock *compile_dag(BasicBlock *block, DagBlock *dag);
+void optimize(GPtrArray *init_instrs, int num_instrs,
+              GPtrArray **out_instrs, int *out_num_instrs);
 
 #endif  // OPTIMIZATION

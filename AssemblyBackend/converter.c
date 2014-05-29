@@ -589,7 +589,6 @@ void compile_unary(Instruction *instr)
                     write_2instr(MOVE_INSTR, result_repr, const_repr);
                     free(result_repr);
                     free(const_repr);
-                    printf("NOW KINDA DONE\n");
                     print_registers(REGISTERS, NUM_REGISTERS);
                 }
             }

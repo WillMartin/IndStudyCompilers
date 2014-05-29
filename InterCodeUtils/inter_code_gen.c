@@ -344,8 +344,6 @@ char *get_next_label()
     as the target jump for each instruction indexed by <list> */
 void back_patch(GPtrArray *instr_list, int num_instrs, GList *list, int instr_idx)
 {
-    printf("BACK PATCHING %d into\n", instr_idx);
-    print_list(list);
     Instruction *op_instr = get_instr(instr_list, num_instrs, instr_idx);
     assert(op_instr != NULL);
 

@@ -47,6 +47,15 @@ char *repr_real(double x)
     return repr;
 }
 
+char *repr_bool(bool b)
+{
+    char *repr = malloc(sizeof(10));
+    // They're going to be freed later.
+    if (b) { sprintf(repr, "%s", "TRUE"); }
+    else   { sprintf(repr, "%s", "FALSE"); }
+    return repr;
+}
+
 /* Returns a newly malloc'd string for any Constant arg <c> */
 char *repr_const(Constant *c)
 {
@@ -66,6 +75,9 @@ char *repr_const(Constant *c)
         case LONG:
             // TODO: give long's their own method
             repr = repr_int(c->int_val); 
+            break;
+        case BOOL:
+            repr = repr_bool(c->bool_val); 
             break;
         default:
             printf("CHAR_CONSTANT ERROR: unknown type");
