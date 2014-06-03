@@ -8,6 +8,7 @@
 #include "repr_utils.h"
 #include "../InterCodeUtils/symbol_table.h"
 #include "../InterCodeUtils/inter_code_gen.h"
+#include "../InterCodeUtils/gc.h"
 
 // Define constants for register names
 //static const int NUM_REGISTERS = 6;

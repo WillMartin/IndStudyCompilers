@@ -4,6 +4,7 @@
 #define INTER_CODE_GEN
 
 #include "symbol_table.h"
+#include "gc.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>

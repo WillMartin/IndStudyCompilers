@@ -155,7 +155,6 @@ void init_stack_variables(GHashTable *address_table)
         // Doesn't matter what we push on.
         write_1instr(PUSH_INSTR, esp_repr);
         stack_offset += data_size;
-        printf("VARIABLE %s AT OFFSET %d\n", cur_id->symbol, stack_offset);
 
         // No value when initialized
         cur_id->on_stack = false;
@@ -196,7 +195,6 @@ void init_registers()
 
 void move_id_to_stack(char *from_loc, Identifier *id)
 {
-    printf("HERE for id %s", id->symbol);
     char *esp_repr = repr_reg(ESP_REGISTER);
     char *added_repr= repr_addr_add(esp_repr, id->offset);
     char *result_loc = repr_addr_ind(added_repr);
@@ -213,7 +211,6 @@ void dump_reg_with_reserve(Register *reg, Identifier *reserved_id)
 {
     GList *cur_list = reg->variables_held;
     Identifier *cur_id;
-    //fprintf(out_file, "IS CUR LIST NULL for id ",  cur_list==NULL);
     for (; cur_list!=NULL; cur_list=cur_list->next)
     {
         cur_id = cur_list->data;
@@ -229,7 +226,6 @@ void dump_reg_with_reserve(Register *reg, Identifier *reserved_id)
 
             if (cur_id->address_descriptor->next != NULL)
             {
-                printf("Or are we not dumping because this %s\n", cur_id->symbol);
                 // If it does then we can remove it from here
                 cur_id->address_descriptor = remove_reg_from_addrs(cur_id->address_descriptor, reg);
             }
@@ -240,7 +236,6 @@ void dump_reg_with_reserve(Register *reg, Identifier *reserved_id)
                 char *added_repr= repr_addr_add(esp_repr, cur_id->offset);
                 char *result_loc = repr_addr_ind(added_repr);
                 char *rrepr = repr_reg(reg);
-                printf("DUMPING id: %s!!!!\n", cur_id->symbol);
                 write_2instr(MOVE_INSTR, result_loc, rrepr);
 
                 free(esp_repr);
@@ -475,14 +470,12 @@ void ensure_register(Identifier *id, Register* load_reg)
         // If this happens then we called ensure register on a register
         // that didn't contain the value, but another did. This seems to indicate
         // something is going wrong with get_reg.
-        //printf("LONG RUNNING THING: I DON'T THINK THIS SHOULD HAPPEN\n");
 
         load_from = repr_reg(alt_reg);
     }
     // If it's not initialized at all, then clearing the register above is enough.
     else if (id->on_stack)
     {
-        printf("Loading from stack\n");
         // Now for the actual loading
         load_from = repr_ident(id);            
         //char *load_from_direct = repr_ident(id);            
@@ -1082,14 +1075,8 @@ void compile(GPtrArray *instr_list, GHashTable* symbol_table,
     init_registers();
     write_header();
     init_stack_variables(symbol_table);
-    printf("CUR STACK %d\n", CUR_STACK_OFFSET);
-    //stack_compile(instr_list, symbol_table, num_instrs, file);
     basic_compile(instr_list, symbol_table, num_instrs);
     write_exit();
     close_file();
-    printf("END: Printing Registers\n");
     print_registers(REGISTERS, NUM_REGISTERS);
 }
-
-
-

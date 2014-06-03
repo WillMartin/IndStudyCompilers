@@ -67,7 +67,7 @@ DagNode *get_most_recent_or_new(GHashTable *most_recents, Arg *arg)
     if (recent_node == NULL)
     {
         // This is an initial identity (it came from the last block)
-        recent_node = malloc(sizeof(DagNode));
+        recent_node = gc_malloc(DAG_NODE_TYPE, sizeof(DagNode));
         recent_node->op_code = NONE;
         recent_node->visited = false;
         recent_node->is_id = true;
@@ -87,7 +87,7 @@ DagNode *get_arg_node(GHashTable *most_recents, GHashTable* dag_table, Arg* arg)
     DagNode *ret_node;
     if (arg->type == CONST)
     {
-        ret_node = malloc(sizeof(DagNode)); 
+        ret_node = gc_malloc(DAG_NODE_TYPE, sizeof(DagNode)); 
         //ret_node->op_code = ASSIGN;
         ret_node->visited = false;
         ret_node->is_id = false;
@@ -152,7 +152,7 @@ DagNode *dag_assign(GHashTable *most_recents, GHashTable* dag_table,
         // Could happen in the (unit'd) x=x case
         arg_node->ids = g_list_remove(arg_node->ids, instr->result);
 
-        DagNode *new_node = malloc(sizeof(DagNode));
+        DagNode *new_node = gc_malloc(DAG_NODE_TYPE, sizeof(DagNode));
         new_node->visited = false;
         new_node->left = arg_node;
         new_node->right = NULL;
@@ -205,6 +205,7 @@ DagNode *dag_unary(GHashTable *most_recents, GHashTable* dag_table,
     // Check to see if this instruction has already been made
     char *instr_hash = hash_instr(instr);
     DagNode *prev_node = g_hash_table_lookup(dag_table, instr_hash);
+    free(instr_hash);
 
     if (prev_node != NULL)
     {
@@ -286,7 +287,7 @@ DagNode *dag_binary(GHashTable *most_recents, GHashTable* dag_table,
 
 DagBlock *generate_dag(BasicBlock *block)
 {
-    DagBlock *db = malloc(sizeof(DagBlock));
+    DagBlock *db = gc_malloc(DAG_BLOCK_TYPE, sizeof(DagBlock));
     // Might be NULL but that doesn't matter
     db->init_label = ((Instruction*)block->instrs->data)->label;
     db->root_nodes = NULL;
@@ -326,7 +327,6 @@ DagBlock *generate_dag(BasicBlock *block)
         else if (!is_relative_op(cur_instr->op_code) && cur_instr->op_code != NOP && 
                  cur_instr->op_code != GOTO && cur_instr->op_code != PRINT)
         {
-            printf("Instruction code: %d\n", cur_instr->op_code);
             DagNode *bin_node = dag_binary(most_recent_table, dag_table, 
                                            &(db->root_nodes), cur_instr);
             // Could just being reused
@@ -338,8 +338,6 @@ DagBlock *generate_dag(BasicBlock *block)
         // Otherwise it's a GOTO, no Node required as it's the last one
         else
         {
-            printf("INSTR: ");
-            print_instr(cur_instr);
             test_goto_last = false;
             db->exit_instr = cur_instr;
         }
@@ -363,7 +361,11 @@ DagBlock *generate_dag(BasicBlock *block)
             cur_root = cur_root->next;
             db->root_nodes = g_list_remove(db->root_nodes, to_rem);
         }
-        else { cur_root=cur_root->next; }
+        else 
+        { 
+            cur_root=cur_root->next; 
+            // Recursively free down 
+        }
     }
 
     return db;
@@ -465,7 +467,7 @@ Arg *traverse_dag(DagNode *root, GList** instr_list)
 
 BasicBlock *compile_dag(BasicBlock *block, DagBlock *dag)
 {   
-    BasicBlock *new_block = malloc(sizeof(BasicBlock));
+    BasicBlock *new_block = gc_malloc(BASIC_BLOCK_TYPE, sizeof(BasicBlock));
     GList *roots = dag->root_nodes;
     GList *instrs = NULL; 
     for (; roots!=NULL; roots=roots->next)
@@ -652,7 +654,7 @@ GList *make_blocks(GPtrArray *instr_list, int num_instrs)
 
     GList *block_list = NULL;
     // First 3-addr ins is a leader
-    BasicBlock *cur_block = malloc(sizeof(BasicBlock)); 
+    BasicBlock *cur_block = gc_malloc(BASIC_BLOCK_TYPE, sizeof(BasicBlock)); 
     cur_block->instrs = NULL;
 
     Instruction *cur_instr, *last_instr;
@@ -677,7 +679,7 @@ GList *make_blocks(GPtrArray *instr_list, int num_instrs)
             cur_block->instrs = g_list_reverse(cur_block->instrs);
             // Prepending is more efficient
             block_list = g_list_prepend(block_list, cur_block);
-            cur_block = malloc(sizeof(BasicBlock));
+            cur_block = gc_malloc(BASIC_BLOCK_TYPE, sizeof(BasicBlock));
             cur_block->instrs = NULL;
             cur_block->instrs = g_list_prepend(cur_block->instrs, cur_instr);
         }
@@ -719,5 +721,7 @@ void optimize(GPtrArray *init_instrs, int init_num_instrs,
     combine_blocks(opt_block_list, out_instrs, out_num_instrs);
     printf("Post optimization\n");
     print_blocks(*out_num_instrs, opt_block_list);
+    g_list_free(opt_block_list);
+    g_list_free(init_blocks);
 }
 

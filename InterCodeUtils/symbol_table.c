@@ -34,7 +34,7 @@ void put_identifier(GHashTable *sym_table, Identifier *id)
 
 Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type)
 {
-    Identifier *id = malloc(sizeof(Identifier));
+    Identifier *id = gc_malloc(IDENT_TYPE, sizeof(Identifier));
     id->symbol = symbol;
     id->type = type;
     id->force_on_stack = false;
@@ -45,8 +45,8 @@ Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type)
 
 Identifier *get_temp_symbol()
 {
-    Identifier *id = malloc(sizeof(Identifier));
-    char *sym = malloc(4 * sizeof(char));
+    Identifier *id = gc_malloc(IDENT_TYPE, sizeof(Identifier));
+    char *sym = gc_malloc(CHAR_TYPE, 4 * sizeof(char));
     sprintf(sym, "t%d", temp_number);
     id->symbol = sym;
     id->force_on_stack = false;

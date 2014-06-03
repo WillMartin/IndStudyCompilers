@@ -50,9 +50,7 @@ char *repr_real(double x)
 char *repr_bool(bool b)
 {
     char *repr = malloc(sizeof(10));
-    // They're going to be freed later.
-    if (b) { sprintf(repr, "%s", "TRUE"); }
-    else   { sprintf(repr, "%s", "FALSE"); }
+    sprintf(repr, "%d", b);
     return repr;
 }
 
@@ -91,7 +89,6 @@ char *repr_const(Constant *c)
 const char *repr_op_code(eOPCode op_code)
 {
     const char *const_repr;
-    printf("OP CODE? %d\n", op_code);
     switch (op_code)
     {
         case NOP:

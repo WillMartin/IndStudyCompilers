@@ -8,6 +8,7 @@
 
 #include "symbol_table.h"
 #include "inter_code_gen.h"
+#include "gc.h"
 
 typedef struct BasicBlock
 {

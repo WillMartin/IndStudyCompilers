@@ -1,6 +1,8 @@
 #ifndef SYMBOL_TABLE
 #define SYMBOL_TABLE
 
+#include "gc.h"
+
 #include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>

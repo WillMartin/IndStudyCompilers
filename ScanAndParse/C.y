@@ -6,6 +6,7 @@
 #include "InterCodeUtils/optimization.h"    
 #include "InterCodeUtils/symbol_table.h"
 #include "InterCodeUtils/inter_code_gen.h"
+#include "InterCodeUtils/gc.h"
     
     // Declare some useful globals when parsing
 GPtrArray *instr_list;
@@ -180,9 +181,9 @@ logical_or_expression:
                   $$->true_list = merge_lists($1->true_list, $4->true_list);
                   $$->false_list = $4->false_list;
                   // Two arguments going into this are just a means to return
-                  // true/false lits
-                  free($1);
-                  free($4);
+                  // true/false lists
+                  //free($1);
+                  //free($4);
               }
 
 logical_and_expression:
@@ -363,7 +364,7 @@ declaration:
                       YYERROR;
                   }
 
-                  id = malloc(sizeof(Identifier));
+                  id = gc_malloc(IDENT_TYPE, sizeof(Identifier));
                   id->type = $1;
                   id->symbol = $2;
                   // For now allocate everything to the stack
@@ -376,12 +377,12 @@ declaration:
                   // If it's a boolean we have to do some alternative work
                   if ($1 == BOOL)
                   {
-                      Constant *true_const = malloc(sizeof(Constant));
+                      Constant *true_const = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
                       true_const->type = BOOL;
                       true_const->bool_val = true;
                       Arg *true_arg = init_arg(CONST, true_const);
 
-                      Constant *false_const = malloc(sizeof(Constant));
+                      Constant *false_const = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
                       false_const->type = BOOL;
                       false_const->bool_val = false;
                       Arg *false_arg = init_arg(CONST, false_const);
@@ -416,7 +417,7 @@ declaration:
                                  num_instrs - 2);
                       g_list_free($4->true_list);
                       g_list_free($4->false_list);
-                      free($4);
+                      //free($4);
                   }
                   else if ($1 != BOOL && $4->false_list == NULL && $4->true_list == NULL)
                   {
@@ -448,7 +449,7 @@ type_specifier:
 
 literal:      INT_LITERAL
               {
-                  Constant *cons = malloc(sizeof(Constant));
+                  Constant *cons = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
                   cons->type = INTEGER;
                   cons->int_val = $1;
 
@@ -456,7 +457,7 @@ literal:      INT_LITERAL
               }
             | REAL_LITERAL
               {
-                  Constant *cons = malloc(sizeof(Constant));
+                  Constant *cons = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
                   cons->type = DOUBLE;
                   cons->int_val = $1;
 
@@ -464,7 +465,7 @@ literal:      INT_LITERAL
               }
             | LONG_LITERAL
               {
-                  Constant *cons = malloc(sizeof(Constant));
+                  Constant *cons = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
                   cons->type = LONG;
                   cons->long_val = $1;
 
@@ -472,7 +473,7 @@ literal:      INT_LITERAL
               }
             | CHAR_LITERAL
               {
-                  Constant *cons = malloc(sizeof(Constant));
+                  Constant *cons = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
                   cons->type = CHAR;
                   cons->str_val = $1;
 
@@ -489,7 +490,7 @@ id:         IDENTIFIER
 
                 $$ = get_identifier(symbol_table, $1);
                 // We're just using one copy of the string.
-                free($1);
+                //free($1);
                 if ($$ == NULL)
                 {
                     yyerror("Use of uninitialized value");
@@ -517,15 +518,15 @@ int main()
     instr_list = init_instr_list();
     num_instrs = 0;
     stack_offset = 0;
-
+    gc_init();
+    
     yyparse();
-
+    
     GPtrArray *opt_instrs = NULL;
     int opt_num_instrs = 0;
-    print_instr_list(instr_list, num_instrs);
     optimize(instr_list, num_instrs, &opt_instrs, &opt_num_instrs);
     compile(opt_instrs, symbol_table, opt_num_instrs, "inter.asm");
-
+    gc_free();
  
     /*print_instr_list(instr_list, num_instrs);
     GList *block_list = make_blocks(instr_list, num_instrs);

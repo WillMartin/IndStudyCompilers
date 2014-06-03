@@ -1,9 +1,10 @@
 CFLAGS=-std=c99 -g
 WITH_GLIB=`pkg-config --cflags --libs glib-2.0`
 OUT_FILE=compiler
+INTER_FOLDER=InterCodeUtils
 
-all: y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o optimization.o
-	gcc $(CFLAGS) y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o optimization.o -o $(OUT_FILE) $(WITH_GLIB)
+all: y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o optimization.o gc.o
+	gcc $(CFLAGS) y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o gc.o optimization.o -o $(OUT_FILE) $(WITH_GLIB)
 
 # Compile yacc file to C
 # -d command specifies to create a header with token definitions (y.tab.h)
@@ -16,14 +17,17 @@ y.tab.c y.tab.h: ScanAndParse/C.y symbol_table.o
 lex.yy.c: ScanAndParse/C.lex y.tab.h symbol_table.o
 	flex ScanAndParse/C.lex
 
-symbol_table.o: InterCodeUtils/symbol_table.c InterCodeUtils/symbol_table.h
-	gcc $(CFLAGS) -c InterCodeUtils/symbol_table.c $(WITH_GLIB)
+symbol_table.o: $(INTER_FOLDER)/symbol_table.c $(INTER_FOLDER)/symbol_table.h
+	gcc $(CFLAGS) -c $(INTER_FOLDER)/symbol_table.c $(WITH_GLIB)
 
-inter_code_gen.o: InterCodeUtils/symbol_table.h InterCodeUtils/symbol_table.c InterCodeUtils/inter_code_gen.c InterCodeUtils/inter_code_gen.h
-	gcc $(CFLAGS) -c InterCodeUtils/inter_code_gen.c InterCodeUtils/symbol_table.c $(WITH_GLIB)
+inter_code_gen.o: $(INTER_FOLDER)/symbol_table.h $(INTER_FOLDER)/symbol_table.c $(INTER_FOLDER)/inter_code_gen.c $(INTER_FOLDER)/inter_code_gen.h
+	gcc $(CFLAGS) -c $(INTER_FOLDER)/inter_code_gen.c $(INTER_FOLDER)/symbol_table.c $(WITH_GLIB)
 
-optimization.o: InterCodeUtils/optimization.h InterCodeUtils/optimization.c InterCodeUtils/symbol_table.h InterCodeUtils/symbol_table.c InterCodeUtils/inter_code_gen.c InterCodeUtils/inter_code_gen.h
-	gcc $(CFLAGS) -c InterCodeUtils/optimization.c InterCodeUtils/symbol_table.c InterCodeUtils/inter_code_gen.c $(WITH_GLIB)
+gc.o: $(INTER_FOLDER)/gc.h $(INTER_FOLDER)/gc.c $(INTER_FOLDER)/symbol_table.h $(INTER_FOLDER)/symbol_table.c $(INTER_FOLDER)/inter_code_gen.c $(INTER_FOLDER)/inter_code_gen.h
+	gcc $(CFLAGS) -c $(INTER_FOLDER)/gc.c $(INTER_FOLDER)/symbol_table.c $(INTER_FOLDER)/inter_code_gen.c $(WITH_GLIB)
+
+optimization.o: $(INTER_FOLDER)/optimization.h $(INTER_FOLDER)/optimization.c $(INTER_FOLDER)/symbol_table.h $(INTER_FOLDER)/symbol_table.c $(INTER_FOLDER)/inter_code_gen.c $(INTER_FOLDER)/inter_code_gen.h
+	gcc $(CFLAGS) -c $(INTER_FOLDER)/optimization.c $(INTER_FOLDER)/symbol_table.c $(INTER_FOLDER)/inter_code_gen.c $(WITH_GLIB)
 
 converter.o: AssemblyBackend/converter.h AssemblyBackend/converter.c register.o repr_utils.o
 	gcc $(CFLAGS) -c AssemblyBackend/converter.h AssemblyBackend/converter.c register.o repr_utils.o $(WITH_GLIB)

@@ -2,9 +2,12 @@
 
 static int NEXT_LABEL = 0;
 
+
 GPtrArray *init_instr_list()
 {
-        return g_ptr_array_new();
+    GPtrArray *arr = g_ptr_array_new();
+    gc_add(GPTR_ARRAY_TYPE, arr);
+    return arr;
 }
 
 void add_instr(GPtrArray *instr_list, int *num_instrs, Instruction *instr)
@@ -191,7 +194,7 @@ GList *add_action_to_instr_range(GPtrArray *instr_list, int num_instrs,
 Instruction *init_base_instr(eOPCode op_code, Arg *arg1, Arg *arg2,
                               Identifier *result, Instruction *goto_addr)
 {
-    Instruction *instr = malloc(sizeof(Instruction));
+    Instruction *instr = gc_malloc(INSTR_TYPE, sizeof(Instruction));
     instr->op_code = op_code;
     instr->arg1 = arg1;
     instr->arg2 = arg2;
@@ -288,7 +291,7 @@ Instruction *gen_multiplicative_instr(GHashTable *sym_table, Arg *arg1, Arg *arg
 
 Arg *init_arg(eArgType type, void *val)
 {
-    Arg *arg = malloc(sizeof(Arg));
+    Arg *arg = gc_malloc(ARG_TYPE, sizeof(Arg));
     arg->true_list = NULL;
     arg->false_list = NULL;
     arg->type = type;
