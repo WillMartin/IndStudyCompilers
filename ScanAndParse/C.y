@@ -115,15 +115,19 @@ iteration_statement:
                                             num_instrs, $2, $8, FORCE_ID_STACK);
                   Instruction *lock_instr = get_instr(instr_list, num_instrs, $2);
                   lock_instr->actions = merge_lists(actions, lock_instr->actions);
+                  // Merge copys them
+                  g_list_free(actions);
 
                   // Don't forget to jump back to the top
                   GList *jump_list = make_list($8-1);
                   back_patch(instr_list, num_instrs, jump_list, $2);
+                  g_list_free(jump_list);
 
                   // And then can free everything back up on the NOP
                   actions = add_action_to_instr_range(instr_list, num_instrs, 
                                                    $2, $8, RELEASE_ID_STACK);
-                  nop->actions = actions;
+                  nop->actions = g_list_copy(actions);
+                  g_list_free(actions);
               }
 
 compound_statement:
@@ -179,7 +183,7 @@ logical_or_expression:
 
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
                   $$->true_list = merge_lists($1->true_list, $4->true_list);
-                  $$->false_list = $4->false_list;
+                  $$->false_list = g_list_copy($4->false_list);
                   // Two arguments going into this are just a means to return
                   // true/false lists
                   //free($1);
@@ -193,7 +197,7 @@ logical_and_expression:
                   back_patch(instr_list, num_instrs, $1->true_list, $3);
 
                   $$ = init_arg(BOOLEAN_EXPR, NULL);
-                  $$->true_list = $4->true_list;
+                  $$->true_list = g_list_copy($4->true_list);
                   $$->false_list = merge_lists($1->false_list, $4->false_list);
                   // Two arguments going into this are just a means to return
                   // true/false lits
@@ -366,6 +370,7 @@ declaration:
 
                   id = gc_malloc(IDENT_TYPE, sizeof(Identifier));
                   id->type = $1;
+                  gc_add(CHAR_TYPE, $2);
                   id->symbol = $2;
                   // For now allocate everything to the stack
                   id->offset = stack_offset;
@@ -514,19 +519,22 @@ int yywrap()
 int main()
 {
     // Init globals
+    gc_init();
     symbol_table = init_symbol_table();
     instr_list = init_instr_list();
     num_instrs = 0;
     stack_offset = 0;
-    gc_init();
     
-    yyparse();
+    bool failed_parse = yyparse();
     
-    GPtrArray *opt_instrs = NULL;
-    int opt_num_instrs = 0;
-    optimize(instr_list, num_instrs, &opt_instrs, &opt_num_instrs);
-    compile(opt_instrs, symbol_table, opt_num_instrs, "inter.asm");
-    gc_free();
+    if (!failed_parse)
+    {
+        GPtrArray *opt_instrs = NULL;
+        int opt_num_instrs = 0;
+        optimize(instr_list, num_instrs, &opt_instrs, &opt_num_instrs);
+        compile(opt_instrs, symbol_table, opt_num_instrs, "inter.asm");
+        gc_free();
+    }
  
     /*print_instr_list(instr_list, num_instrs);
     GList *block_list = make_blocks(instr_list, num_instrs);

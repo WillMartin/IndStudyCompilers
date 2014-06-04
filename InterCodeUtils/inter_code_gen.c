@@ -174,7 +174,7 @@ GList *add_action_to_instr_range(GPtrArray *instr_list, int num_instrs,
 
         if (cur_instr->arg1 != NULL && cur_instr->arg1->type == IDENT)
         {
-            Action *arg1_action = malloc(sizeof(Action)); 
+            Action *arg1_action = gc_malloc(ACTION_TYPE, sizeof(Action)); 
             arg1_action->type = type;
             arg1_action->id = cur_instr->arg1->ident_val;
             actions = g_list_prepend(actions, arg1_action);
@@ -182,7 +182,7 @@ GList *add_action_to_instr_range(GPtrArray *instr_list, int num_instrs,
 
         if (cur_instr->arg2 != NULL && cur_instr->arg2->type == IDENT)
         {
-            Action *arg2_action = malloc(sizeof(Action)); 
+            Action *arg2_action = gc_malloc(ACTION_TYPE, sizeof(Action)); 
             arg2_action->type = type;
             arg2_action->id = cur_instr->arg2->ident_val;
             actions = g_list_prepend(actions, arg2_action);
@@ -325,7 +325,7 @@ void *print_list(GList *l)
 /* Concatatenates <l1>, <l2> and returns the result */
 GList *merge_lists(GList *l1, GList *l2)
 {
-    return g_list_concat(l1, l2);
+    return g_list_copy(g_list_concat(l1, l2));
 }
 
 /* Create a new GList containing only <instr_idx> */
@@ -336,7 +336,7 @@ GList *make_list(int instr_idx)
 
 char *get_next_label()
 {
-    char *label = malloc(5);
+    char *label = gc_malloc(CHAR_TYPE, 5);
     sprintf(label, ".l%d", NEXT_LABEL);
     NEXT_LABEL += 1;
     return label;

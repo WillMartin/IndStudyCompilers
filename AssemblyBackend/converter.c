@@ -146,14 +146,11 @@ void init_stack_variables(GHashTable *address_table)
     int stack_offset = 0;
     int data_size = 0;
     Identifier *cur_id;
-    char *esp_repr = repr_reg(REGISTERS[0]);
+    char *esp_repr = repr_reg(ESP_REGISTER);
     for (; local_ids != NULL; local_ids = local_ids->next)
     {
         cur_id = (Identifier *) local_ids->data;
         data_size = get_byte_size(cur_id->type);
-
-        // Doesn't matter what we push on.
-        write_1instr(PUSH_INSTR, esp_repr);
         stack_offset += data_size;
 
         // No value when initialized
@@ -161,7 +158,10 @@ void init_stack_variables(GHashTable *address_table)
         cur_id->offset = stack_offset;
         cur_id->address_descriptor = NULL;
     }
+    char *offset_repr = repr_int(stack_offset);
+    write_2instr(SUB_INSTR, esp_repr, offset_repr);
     free(esp_repr);
+    free(offset_repr);
     // Now free the list structure itself (not FULL as we still want the Identifiers)
     g_list_free(head);
 }
@@ -536,10 +536,8 @@ void compile_unary(Instruction *instr)
             {
                 // If we have to use the stack, don't worry about doing complicated
                 // register operations. Just move a const to the stack
-                printf("ASSIGNED? %s\n", assigned->symbol);
                 if (assigned->force_on_stack)
                 {
-                    printf("\t BUT NOT FORCE\n");
                     g_list_free(assigned->address_descriptor);
                     assigned->address_descriptor = NULL;
                     assigned->on_stack = true;
@@ -557,7 +555,6 @@ void compile_unary(Instruction *instr)
                 }    
                 else
                 {
-                    print_registers(REGISTERS, NUM_REGISTERS);
 
                     // Variable's value is now only here.
                     Register *result_reg = get_reg_for_arg(assigned, assigned,
@@ -582,7 +579,6 @@ void compile_unary(Instruction *instr)
                     write_2instr(MOVE_INSTR, result_repr, const_repr);
                     free(result_repr);
                     free(const_repr);
-                    print_registers(REGISTERS, NUM_REGISTERS);
                 }
             }
             else if (operand->type == IDENT)
@@ -729,11 +725,9 @@ void compile_binary(Instruction *instr)
     // Repr of the arg which will opped to the result reg.
     char *op_arg_repr;
     char *result_repr = repr_reg(result_reg);
-    printf("REG TO ADD %d\n", reg_to_add);
     switch (reg_to_add)
     {
         case -1:;
-            printf("CASE 1\n");
             // Load the first arg into the result reg and then op the 
             // other register
 
@@ -754,21 +748,16 @@ void compile_binary(Instruction *instr)
                 // Load the operand into the result reg. (something will
                 // be added/mult'd/etc. soon
                 // Ensure does any loading we might need to do.
-                //printf("ENSURING REGISTER FOR %s\n", instr->arg1->ident_val->symbol);
-                //fprintf(out_file, "TEST\n");
                 ensure_register(instr->arg1->ident_val, result_reg);
-                //fprintf(out_file, "AFTER TEST\n");
             }
 
             op_arg_repr = repr_arg(instr->arg2);
             break;
         case 0:
-            printf("CASE 2\n");
             // The first argument is already in result reg just add second
             op_arg_repr = repr_arg(instr->arg2);
             break;
         case 1:
-            printf("CASE 3\n");
             // The second argument is already in result reg just add first
             op_arg_repr = repr_arg(instr->arg1);
             break;
@@ -815,7 +804,6 @@ void perform_instr_actions(Instruction *instr)
         switch (cur_action->type)
         {
             case FORCE_ID_STACK:
-                printf("FORCING %s on stack\n", action_id->symbol);
                 action_id->force_on_stack = true;
                 // Move it to the stack if we can.
                 /* For example in case  
@@ -840,7 +828,6 @@ void perform_instr_actions(Instruction *instr)
                 }
                 break;
             case RELEASE_ID_STACK:
-                printf("Releasing %s on stack\n", action_id->symbol);
                 action_id->force_on_stack = false;
                 break;
             default:
@@ -1078,5 +1065,4 @@ void compile(GPtrArray *instr_list, GHashTable* symbol_table,
     basic_compile(instr_list, symbol_table, num_instrs);
     write_exit();
     close_file();
-    print_registers(REGISTERS, NUM_REGISTERS);
 }

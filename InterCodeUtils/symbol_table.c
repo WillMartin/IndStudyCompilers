@@ -35,6 +35,7 @@ void put_identifier(GHashTable *sym_table, Identifier *id)
 Identifier *put_symbol(GHashTable *sym_table, char *symbol, eType type)
 {
     Identifier *id = gc_malloc(IDENT_TYPE, sizeof(Identifier));
+    gc_add(CHAR_TYPE, id->symbol);
     id->symbol = symbol;
     id->type = type;
     id->force_on_stack = false;

@@ -5,7 +5,6 @@ GList *gc_list;
 
 void gc_add(ePtrType type, void *ptr)
 {
-    return;
     GCPtr *gc_ptr = malloc(sizeof(GCPtr));
     gc_ptr->type = type;
     gc_ptr->ptr = ptr;
@@ -26,7 +25,10 @@ void gc_free()
         GCPtr *gc_ptr = freed->data;
         switch (gc_ptr->type)
         {
-            case ARG_TYPE:
+            case ARG_TYPE:;
+                Arg *arg = gc_ptr->ptr;
+                g_list_free(arg->true_list);
+                g_list_free(arg->false_list);
                 free(gc_ptr->ptr);
                 break;
             case IDENT_TYPE:;
@@ -59,7 +61,12 @@ void gc_free()
             case CONSTANT_TYPE:
                 free(gc_ptr->ptr);
                 break;
-            case INSTR_TYPE:
+            case INSTR_TYPE:;
+                Instruction *instr = gc_ptr->ptr;
+                g_list_free(instr->actions);
+                free(instr);
+                break;
+            case ACTION_TYPE:
                 free(gc_ptr->ptr);
                 break;
         }
@@ -73,10 +80,12 @@ void gc_free()
 void *gc_malloc(ePtrType type, int size)
 {
     void *x = malloc(size);
+    gc_add(type, x);
+    /*
     GCPtr *gc_ptr = malloc(sizeof(GCPtr));
     gc_ptr->type = type;
     gc_ptr->ptr = x;
-
     gc_list = g_list_prepend(gc_list, gc_ptr);
+    */
     return x;
 }

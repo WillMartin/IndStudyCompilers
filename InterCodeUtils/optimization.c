@@ -261,7 +261,7 @@ DagNode *dag_binary(GHashTable *most_recents, GHashTable* dag_table,
     arg1_node->ids = g_list_remove(arg1_node->ids, instr->result);
     arg2_node->ids = g_list_remove(arg2_node->ids, instr->result);
 
-    DagNode *new_node = malloc(sizeof(DagNode));
+    DagNode *new_node = gc_malloc(DAG_NODE_TYPE, sizeof(DagNode));
     new_node->visited = false;
     new_node->left = arg1_node;
     new_node->right = arg2_node;
@@ -484,7 +484,7 @@ BasicBlock *compile_dag(BasicBlock *block, DagBlock *dag)
     new_block->instrs = instrs;
     Instruction *first_instr = instrs->data;
     first_instr->label = dag->init_label;
-    new_block->successors = block->successors;
+    new_block->successors = g_list_copy(block->successors);
     return new_block;
 }
 

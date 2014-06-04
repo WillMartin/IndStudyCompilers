@@ -18,6 +18,7 @@ typedef enum ePtrType
     DAG_NODE_TYPE,
     CONSTANT_TYPE,
     INSTR_TYPE,
+    ACTION_TYPE,
 } ePtrType;
 
 typedef struct GCPtr
