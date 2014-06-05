@@ -128,6 +128,9 @@ void *add_action_to_instr(Instruction *instr, Action *act);
 Instruction *gen_additive_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
 Instruction *gen_subtractive_instr(GHashTable *sym_table, Arg *arg1, Arg *arg2);
 Instruction *gen_multiplicative_instr(GHashTable *symbol_table, Arg *arg1, Arg *arg);
+bool gen_bool_instrs(GPtrArray *instr_list, int *num_instrs,
+                     Identifier *id, Arg *arg);
+
 
 Arg *init_arg(eArgType type, void *val);
 

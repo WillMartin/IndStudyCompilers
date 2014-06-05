@@ -2,7 +2,6 @@
 
 static int NEXT_LABEL = 0;
 
-
 GPtrArray *init_instr_list()
 {
     GPtrArray *arr = g_ptr_array_new();
@@ -233,15 +232,50 @@ Instruction *init_nop_instr()
     return init_base_instr(NOP, NULL, NULL, NULL, NULL);
 }
 
-/* Returns instruction set to perform cast
-   Returns NULL if the operation is unsuccessful 
-        (e.g. wrong arg types)
-Instruction *gen_cast_instr(Arg *arg, eOPCode desired_type)
+// Done in place. true if successful, else false 
+bool gen_bool_instrs(GPtrArray *instr_list, int *num_instrs,
+                      Identifier *id, Arg *arg)
 {
-    //TODO: implement this ... at all
-    return init_instruction(CAST, arg, NULL);
+    Constant *true_const = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
+    true_const->type = BOOL;
+    true_const->bool_val = true;
+    Arg *true_arg = init_arg(CONST, true_const);
+
+    Constant *false_const = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
+    false_const->type = BOOL;
+    false_const->bool_val = false;
+    Arg *false_arg = init_arg(CONST, false_const);
+
+    // If it doesn't then it's not a boolean expression
+    if (arg->false_list == NULL && arg->true_list == NULL)
+    {
+        return false;
+    }
+
+    Instruction *true_assign = init_assign_instr(true_arg, id);
+    // Need to link interm goto to it. It NEEDS to be added last
+    Instruction *nop = init_nop_instr();
+    Instruction *interm_goto = init_goto_instr(nop);
+    Instruction *false_assign = init_assign_instr(false_arg, id);
+
+    add_instr(instr_list, num_instrs, true_assign);
+    add_instr(instr_list, num_instrs, interm_goto);
+    add_instr(instr_list, num_instrs, false_assign);
+    add_instr(instr_list, num_instrs, nop);
+     
+    // Easier than rewriting backpatch
+    // Tell the goto to jump over the false assign
+    GList *interm_goto_list = make_list(*num_instrs - 3);
+    back_patch(instr_list, *num_instrs, interm_goto_list, *num_instrs - 1);
+    g_list_free(interm_goto_list);
+
+    back_patch(instr_list, *num_instrs, arg->true_list, 
+               *num_instrs - 4);
+    back_patch(instr_list, *num_instrs, arg->false_list, 
+               *num_instrs - 2);
+    return true;
 }
-*/
+
 
 /* Returns instruction set to perform addition
    Returns NULL if the operation is unsuccessful 

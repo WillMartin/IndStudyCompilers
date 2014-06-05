@@ -350,8 +350,20 @@ assignment_expression:
             | logical_or_expression
             | id ASSIGN_OP expression 
               {
-                  Instruction *instr = init_assign_instr($3, $1);
-                  add_instr(instr_list, &num_instrs, instr);
+                  if ($1->type == BOOL)
+                  {
+                      bool result = gen_bool_instrs(instr_list, &num_instrs, $1, $3);
+                      if (!result)
+                      {
+                          yyerror("Invalid assignment to boolean assignment");
+                          YYERROR;
+                      }
+                  }
+                  else
+                  {
+                      Instruction *instr = init_assign_instr($3, $1);
+                      add_instr(instr_list, &num_instrs, instr);
+                  }
                   $$ = NULL;
               }
             ;
@@ -382,47 +394,12 @@ declaration:
                   // If it's a boolean we have to do some alternative work
                   if ($1 == BOOL)
                   {
-                      Constant *true_const = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
-                      true_const->type = BOOL;
-                      true_const->bool_val = true;
-                      Arg *true_arg = init_arg(CONST, true_const);
-
-                      Constant *false_const = gc_malloc(CONSTANT_TYPE, sizeof(Constant));
-                      false_const->type = BOOL;
-                      false_const->bool_val = false;
-                      Arg *false_arg = init_arg(CONST, false_const);
-
-                      // If it doesn't then it's not a boolean expression
-                      if ($4->false_list == NULL && $4->true_list == NULL)
+                      bool result = gen_bool_instrs(instr_list, &num_instrs, id, $4);
+                      if (!result)
                       {
                           yyerror("Invalid assignment to boolean assignment");
                           YYERROR;
                       }
-
-                      Instruction *true_assign = init_assign_instr(true_arg, id);
-                      // Need to link interm goto to it. It NEEDS to be added last
-                      Instruction *nop = init_nop_instr();
-                      Instruction *interm_goto = init_goto_instr(nop);
-                      Instruction *false_assign = init_assign_instr(false_arg, id);
-
-                      add_instr(instr_list, &num_instrs, true_assign);
-                      add_instr(instr_list, &num_instrs, interm_goto);
-                      add_instr(instr_list, &num_instrs, false_assign);
-                      add_instr(instr_list, &num_instrs, nop);
-                         
-                      // Easier than rewriting backpatch
-                      // Tell the goto to jump over the false assign
-                      GList *interm_goto_list = make_list(num_instrs - 3);
-                      back_patch(instr_list, num_instrs, interm_goto_list, num_instrs - 1);
-                      g_list_free(interm_goto_list);
-
-                      back_patch(instr_list, num_instrs, $4->true_list, 
-                                 num_instrs - 4);
-                      back_patch(instr_list, num_instrs, $4->false_list, 
-                                 num_instrs - 2);
-                      g_list_free($4->true_list);
-                      g_list_free($4->false_list);
-                      //free($4);
                   }
                   else if ($1 != BOOL && $4->false_list == NULL && $4->true_list == NULL)
                   {

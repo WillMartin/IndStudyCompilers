@@ -1,3 +1,4 @@
+/* Garbage collection code. Basically throws everything into a giant list and then frees it when gc_free() is called */
 #include "inter_code_gen.h"
 #include "optimization.h"
 #include "gc.h"
@@ -81,11 +82,5 @@ void *gc_malloc(ePtrType type, int size)
 {
     void *x = malloc(size);
     gc_add(type, x);
-    /*
-    GCPtr *gc_ptr = malloc(sizeof(GCPtr));
-    gc_ptr->type = type;
-    gc_ptr->ptr = x;
-    gc_list = g_list_prepend(gc_list, gc_ptr);
-    */
     return x;
 }

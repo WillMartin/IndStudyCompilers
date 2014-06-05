@@ -608,7 +608,6 @@ BasicBlock *get_addr_block(GList *blocks, Instruction *to_find)
         GList *instr = cur_block->instrs;
         for (; instr!=NULL; instr=instr->next)
         {
-
             if (((Instruction*)instr->data) == to_find)
             {
                 return cur_block;

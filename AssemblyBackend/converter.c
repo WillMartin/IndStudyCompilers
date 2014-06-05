@@ -1,6 +1,5 @@
 #include "converter.h"
 /* Contains intermediate to assembly code conversion code. */
-// Actually define global
 
 /* Maps types to corresponding byte size. */
 int get_byte_size(eType type)
@@ -31,6 +30,7 @@ int get_byte_size(eType type)
     return size;
 }
 
+/* START SECTION: WRITE_UTILS */
 void write_label(Instruction *instr)
 {
     fprintf(out_file, "%s:\n", instr->label);
@@ -61,7 +61,9 @@ void write_2instr(const char *command,
 {
     write_2instr_with_option(command, "", arg1, arg2);
 }
+/* END SECTION: WRITE_UTILS */
 
+/* Store off caller registers when calling a function (i.e. print) */
 void store_caller_regs()
 {
     // The first register is the result and the next 3 are not nec. kept
@@ -78,6 +80,7 @@ void store_caller_regs()
     }
 }
 
+/* Restore caller registers to previous state after calling a function (i.e. print) */
 void restore_caller_regs()
 {
     // Also a bit inefficient as we don't know if we actually need to dump them
@@ -547,7 +550,7 @@ void compile_unary(Instruction *instr)
                     char *result_loc = repr_addr_ind(added_repr);
                     char *const_repr = repr_const(operand->const_val);
                     // And finally do the load
-                    write_2instr(MOVE_INSTR, result_loc, const_repr);
+                    write_2instr_with_option(MOVE_INSTR, DWORD_OPTION, result_loc, const_repr);
                     free(esp_repr);
                     free(added_repr);
                     free(result_loc);
@@ -638,8 +641,8 @@ void compile_cond(Instruction *instr)
         arg1_repr = repr_arg(instr->arg2);
         arg2_repr = repr_arg(instr->arg1);
         flipped = true;
-        printf("FLIPPED\n");
     }
+    // Two constants so load the first one
     else if (instr->arg1->type == CONST && instr->arg2->type == CONST)
     {
         bool reserved_regs[6] = {0};
@@ -655,7 +658,32 @@ void compile_cond(Instruction *instr)
         arg1_repr = reg_repr;
         arg2_repr = repr_arg(instr->arg2);
     }
-    // Includes case when arg2 == constant but arg1 isn't
+    else if (instr->arg2->type == CONST)
+    {
+        arg1_repr = repr_arg(instr->arg1);
+        arg2_repr = repr_arg(instr->arg2);
+    }
+    // Cases when both are ident values
+    else if (instr->arg1->ident_val->on_stack && 
+             instr->arg2->ident_val->on_stack)
+    {
+        Identifier *id = instr->arg1->ident_val;
+        // We can't have both on the stack
+        bool reserved_regs[6] = {0};
+        // Get a register for the first constant
+        Register *reg = get_reg_for_arg(id, id, NULL, reserved_regs);
+        ensure_register(id, reg);
+        dump_reg_with_reserve(reg, id);
+        id->address_descriptor = g_list_prepend(id->address_descriptor, reg);
+
+        char *reg_repr = repr_reg(reg); 
+        char *id_repr = repr_ident(id);
+        write_2instr_with_option(MOVE_INSTR, DWORD_OPTION, 
+                                 reg_repr, id_repr);
+        free(id_repr);
+        arg1_repr = reg_repr;
+        arg2_repr = repr_arg(instr->arg2);
+    }
     else
     {
         arg1_repr = repr_arg(instr->arg1);
