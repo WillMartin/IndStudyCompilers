@@ -88,7 +88,6 @@ DagNode *get_arg_node(GHashTable *most_recents, GHashTable* dag_table, Arg* arg)
     if (arg->type == CONST)
     {
         ret_node = gc_malloc(DAG_NODE_TYPE, sizeof(DagNode)); 
-        //ret_node->op_code = ASSIGN;
         ret_node->visited = false;
         ret_node->is_id = false;
         ret_node->init_arg = arg;
@@ -99,15 +98,8 @@ DagNode *get_arg_node(GHashTable *most_recents, GHashTable* dag_table, Arg* arg)
     }
     else if (arg->type == IDENT)
     {
-        //ret_node = malloc(sizeof(DagNode));
-        //ret_node->op_code = ASSIGN;
-        //ret_node->is_id = true;
-        //ret_node->ids = NULL;
-
         // Check where the most recent copy of it is
         ret_node = get_most_recent_or_new(most_recents, arg);
-
-        //ret_node->children = g_list_prepend(NULL, recent_node);
     }
     else { assert(false); }
 
@@ -125,7 +117,9 @@ bool arg_is_valid(Arg *arg, DagNode *node, GHashTable *most_recents)
         DagNode *recent_node = g_hash_table_lookup(most_recents, arg->ident_val->symbol);
         // If it were NULL then it would rely on an uninitialized symbol
         assert(recent_node!=NULL);
-
+        printf("Recent node %p\n", recent_node);   
+        printf("Left node %p\n",   node->left);   
+        printf("right node %p\n",   node->right);   
         // Make sure that the node that the old instruction hashed to has the 
         // most recent value for the val.
         if (node->left != recent_node && node->right != recent_node)
@@ -235,11 +229,13 @@ DagNode *dag_binary(GHashTable *most_recents, GHashTable* dag_table,
     char *instr_hash = hash_instr(instr);
     DagNode *prev_node = g_hash_table_lookup(dag_table, instr_hash);
 
+    printf("PREV NODE NULL? %p\n", prev_node);
     if (prev_node != NULL)
     {
         bool arg1_valid = arg_is_valid(instr->arg1, prev_node, most_recents);
         bool arg2_valid = arg_is_valid(instr->arg2, prev_node, most_recents);
 
+        printf("Valids? %d, %d\n", arg1_valid, arg2_valid);
         if (arg1_valid && arg2_valid)
         {
             // Don't want duplicates
@@ -323,6 +319,7 @@ DagBlock *generate_dag(BasicBlock *block)
             {
                 db->root_nodes = g_list_prepend(db->root_nodes, assign_node);
             }
+            else { printf("ASSIGN\n"); }
         }
         else if (!is_relative_op(cur_instr->op_code) && cur_instr->op_code != NOP && 
                  cur_instr->op_code != GOTO && cur_instr->op_code != PRINT)
@@ -334,6 +331,7 @@ DagBlock *generate_dag(BasicBlock *block)
             {
                 db->root_nodes = g_list_prepend(db->root_nodes, bin_node);
             }
+            else { printf("HERE\n"); }
         }
         // Otherwise it's a GOTO, no Node required as it's the last one
         else
@@ -373,7 +371,94 @@ DagBlock *generate_dag(BasicBlock *block)
 
 // Compile into a list of Instruction* objects (instr_list)
 // Return a list of Arg* for the level above to use
-Arg *traverse_dag(DagNode *root, GList** instr_list)
+void traverse_dag(DagNode *root, GList** instr_list)
+{
+    // Don't generate the same instruction more times than necessary
+    if (root->init_arg != NULL || root->op_code == NONE) { return; }
+
+    if (root->op_code == ASSIGN)
+    {
+        // Grab the first arg
+        traverse_dag(root->left, instr_list);
+        Arg *arg = root->left->init_arg;
+        // We need to store it in a result somewhere.
+        // Get a temp node!
+        if (root->ids == NULL)
+        {
+            Identifier *temp = get_temp_symbol();
+            Instruction *assign = init_assign_instr(arg, temp);
+            Arg *ret_arg = init_arg(IDENT, temp); 
+            *instr_list = g_list_prepend(*instr_list, assign);
+            root->init_arg = ret_arg; 
+        }
+        else
+        {
+            // For now assign all variables correctly
+            GList *cur_id = root->ids;
+            Identifier *to_assign;
+            // And now set all the next ones to the first assign result
+            for (; cur_id!=NULL; cur_id=cur_id->next)
+            {
+                to_assign = cur_id->data;
+                Instruction *assign = init_assign_instr(arg, to_assign);
+                *instr_list = g_list_prepend(*instr_list, assign);
+            }
+            // Won't be unit'd because ids!=NULL
+            root->init_arg = init_arg(IDENT, to_assign);
+            /* So here's why it doesn't matter which one we pick:
+                THEY HAVE THE SAME VALUE!
+                Because we can't change things in place at the moment it really
+                doesn't matter.
+            */
+        }
+    }
+    // Kind of a hack to get this functionish thing working
+    else if (root->op_code == PRINT)
+    {
+        // Shouldn't happen since PRINT is now regarded as a GOTO
+        assert(false);
+    }
+    // Our binary friends
+    else if (!is_relative_op(root->op_code) && root->op_code!=GOTO)
+    {
+        traverse_dag(root->left, instr_list);
+        traverse_dag(root->right, instr_list);
+        Arg *arg1 = root->left->init_arg;
+        Arg *arg2 = root->right->init_arg;
+        // Same as in ASSIGN, see explanations there
+        if (root->ids == NULL)
+        {
+            Identifier *temp = get_temp_symbol();
+            Instruction *instr = init_instr(root->op_code, arg1, arg2, temp);
+            Arg *ret_arg = init_arg(IDENT, temp); 
+            *instr_list = g_list_prepend(*instr_list, instr);
+            root->init_arg = ret_arg;
+        }
+        else
+        {
+            // Only do a lot of work (i.e. operand) once, then assign
+            GList *cur_id = root->ids;
+
+            Instruction *bin_instr = init_instr(root->op_code, arg1, arg2, cur_id->data);
+            *instr_list = g_list_prepend(*instr_list, bin_instr);
+            cur_id = cur_id->next;
+
+            Arg *ret_arg = init_arg(IDENT, bin_instr->result);
+            // And now set all the next ones to the first binary result
+            for (; cur_id!=NULL; cur_id=cur_id->next)
+            {
+                Identifier *to_assign = cur_id->data;
+                Instruction *assign = init_assign_instr(ret_arg, to_assign);
+                *instr_list = g_list_prepend(*instr_list, assign);
+            }
+            root->init_arg = ret_arg;
+        }
+    }
+}
+
+// Compile into a list of Instruction* objects (instr_list)
+// Return a list of Arg* for the level above to use
+Arg *_traverse_dag(DagNode *root, GList** instr_list)
 {
     // Special case for init Dag node
     if (root->op_code == NONE)
@@ -384,7 +469,7 @@ Arg *traverse_dag(DagNode *root, GList** instr_list)
     else if (root->op_code == ASSIGN)
     {
         // Grab the first arg
-        Arg *arg = traverse_dag(root->left, instr_list);
+        Arg *arg = _traverse_dag(root->left, instr_list);
         // We need to store it in a result somewhere.
         // Get a temp node!
         if (root->ids == NULL)
@@ -422,7 +507,7 @@ Arg *traverse_dag(DagNode *root, GList** instr_list)
     {
         // Shouldn't happen since PRINT is now regarded as a GOTO
         assert(false);
-        Arg *arg = traverse_dag(root->left, instr_list);
+        Arg *arg = _traverse_dag(root->left, instr_list);
         Instruction *instr = init_instr(PRINT, arg, NULL, NULL);
         *instr_list = g_list_prepend(*instr_list, instr);
         return arg;
@@ -430,8 +515,8 @@ Arg *traverse_dag(DagNode *root, GList** instr_list)
     // Our binary friends
     else if (!is_relative_op(root->op_code) && root->op_code!=GOTO)
     {
-        Arg *arg1 = traverse_dag(root->left, instr_list);
-        Arg *arg2 = traverse_dag(root->right, instr_list);
+        Arg *arg1 = _traverse_dag(root->left, instr_list);
+        Arg *arg2 = _traverse_dag(root->right, instr_list);
 
         // Same as in ASSIGN, see explanations there
         if (root->ids == NULL)
@@ -508,41 +593,27 @@ void set_dags_visit(GList* root_nodes, bool is_visited)
     }
 }
 
-char *repr_dag_node(DagNode *node)
+void print_dag_node(DagNode *node)
 {
-    char *repr = malloc(50);
     printf("Node:\n");
+    printf("OP: %s at %p holds: %d id's\n", OP_CODE_REPRS[node->op_code], 
+            node, g_list_length(node->ids));
+
     for (GList *x=node->ids; x!=NULL; x=x->next)
     {
         printf("\tID: %s\n", ((Identifier*)x->data)->symbol);
     }
-    sprintf(repr, "OP: %s at %p holds: %d id's\n", OP_CODE_REPRS[node->op_code], 
-            node, g_list_length(node->ids));
-    return repr;
 }
 
 void print_dag_rec(DagNode *cur_node, int depth)
 {
-    /*
-    char *spacing = malloc(depth+1);
-    // Dumb as hell but that's how it's got to go
-    for (int i=0; i<depth; i++)
-    {
-        spacing[i] = " ";
-    }
-    */
     if (cur_node!=NULL && !cur_node->visited)
     {
         cur_node->visited = true;
-        char *node_repr = repr_dag_node(cur_node);
-        char *format = malloc(strlen(node_repr)+depth+5);
-        //sprintf(format, "%s%s\n", spacing,node_repr);
-        sprintf(format, "%d%s\n", depth,node_repr);
+        printf("DEPTH %d\n", depth);
+        print_dag_node(cur_node);
         print_dag_rec(cur_node->left, depth+1);
         print_dag_rec(cur_node->right, depth+1);
-        //free(spacing);
-        free(node_repr);
-        free(format);
     }
 }
 
@@ -712,6 +783,8 @@ void optimize(GPtrArray *init_instrs, int init_num_instrs,
     {
         BasicBlock *orig_block = cur_block->data;
         DagBlock *dag = generate_dag(orig_block);
+        printf("PRINTING BLOCK\n");
+        print_dag(dag);
         BasicBlock *opt_block = compile_dag(orig_block, dag);
         opt_block_list = g_list_prepend(opt_block_list, opt_block);
     }
