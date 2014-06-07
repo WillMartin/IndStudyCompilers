@@ -29,7 +29,7 @@ GList *remove_reg_from_addrs(GList *addrs, Register *reg)
     return NULL;
 }
 
-/* Deletes id from the given register */
+/* Deletes id from all registers it's currently in */
 void remove_id_from_regs(Identifier *id)
 {
     GList *addrs = id->address_descriptor;
