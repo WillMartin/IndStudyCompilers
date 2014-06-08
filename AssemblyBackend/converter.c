@@ -379,6 +379,58 @@ int get_index_for_reg(Register *reg)
     return -1;
 }
 
+// Assuming for now that everything passed here will be ids
+void *get_regs(Instruction *instr, Register **res_reg, 
+               Register **arg1_reg, Register **arg2_reg)
+{
+    bool reserved_regs[6] = {0};
+    // Figure out which variables are needed
+    // For now arg2 should ALWAYS be null
+    // But in the future that might not be true
+    if (instr->op_code == ASSIGN && instr->arg2 == NULL)
+    {
+        // Use book algorithm
+        if (instr->arg1->type == IDENT)
+        {
+            // This is easy since we can just use the first args register
+            Register *arg_reg = get_reg_for_arg(instr->arg1->ident_val, instr->result, 
+                                                NULL, reserved_regs);
+            *arg1_reg = arg_reg;
+            *res_reg = arg_reg;
+        }
+        // Even if we just assign a constant we need to find a register for the result
+        else
+        {
+            //TODO: additional rules for this probably
+            *res_reg = get_reg_for_arg(instr->result, NULL, NULL, reserved_regs);
+        }
+    }
+    else
+    {
+        // Only want to get registers for non-constants
+        if (instr->arg1->type == IDENT)
+        {
+            // In this case we need to find registers for all of the them
+            *arg1_reg = get_reg_for_arg(instr->arg1->ident_val, 
+                              instr->result, instr->arg2->ident_val, reserved_regs);
+
+            reserved_regs[get_index_for_reg(*arg1_reg)] = true;
+        }
+
+        if (instr->arg2->type == IDENT)
+        {
+            *arg2_reg = get_reg_for_arg(instr->arg2->ident_val, 
+                              instr->result, instr->arg1->ident_val, reserved_regs);
+
+            reserved_regs[get_index_for_reg(*arg2_reg)] = true;
+        }
+ 
+        //TODO: there are extra rules for this (pg. 548)
+        *res_reg = get_reg_for_arg(instr->result, NULL, NULL, reserved_regs);
+
+    }
+}
+
 /* Ensures that id is in the load_reg, either by loading it or just validating
    that it's already there. If the id has never been used (i.e. not in a register
    nor is it valid on the stack, just clear out the register, and tell the register

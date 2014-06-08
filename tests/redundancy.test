@@ -4,13 +4,11 @@
     while (x < 10)
     {
         int y = x;
-        int a = x;
         print(y);
-        a = x + 1;
-        // Oops! Stupid programming error, calculating duplicate values!
-        y = x + 1;
-        x = y;
-        // And another! Very silly of me
+        x = x + 1;
+        // Oops! Stupid programming error 
         x = x;
+        // And another! We don't even care!
+        x = y + 2;
     }
 }
