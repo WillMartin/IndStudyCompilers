@@ -475,9 +475,7 @@ id:         IDENTIFIER
                 //free($1);
                 if ($$ == NULL)
                 {
-                    char *error = gc_malloc(CHAR_TYPE, sizeof(100));
-                    sprintf(error, "Use of uninitialized value: %s", $1);
-                    yyerror(error);
+                    yyerror("Use of uninitialized value");
                     YYERROR;
                 } 
             };
@@ -510,9 +508,8 @@ int main()
     {
         GPtrArray *opt_instrs = NULL;
         int opt_num_instrs = 0;
-        //optimize(instr_list, num_instrs, &opt_instrs, &opt_num_instrs);
-        //compile(opt_instrs, symbol_table, opt_num_instrs, "inter.asm");
-        compile(instr_list, symbol_table, num_instrs, "inter.asm");
+        optimize(instr_list, num_instrs, &opt_instrs, &opt_num_instrs);
+        compile(opt_instrs, symbol_table, opt_num_instrs, "inter.asm");
         gc_free();
     }
  
