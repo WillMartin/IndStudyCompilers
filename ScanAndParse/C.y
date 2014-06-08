@@ -512,23 +512,4 @@ int main()
         compile(opt_instrs, symbol_table, opt_num_instrs, "inter.asm");
         gc_free();
     }
- 
-    /*print_instr_list(instr_list, num_instrs);
-    GList *block_list = make_blocks(instr_list, num_instrs);
-    print_blocks(num_instrs, block_list);
-    */
-    
-    
-    /*
-    // Just for first block
-    DagBlock *dag = generate_dag(block_list->data);
-    print_dag(dag);
-    BasicBlock *new_block = compile_dag(NULL, dag);
-    print_block(new_block);
-    */
-
-    //combine_blocks(block_list, &new_instr_list, &new_num_instrs);
-    //print_instr_list(new_instr_list, num_instrs);
-    //compile(new_instr_list, symbol_table, new_num_instrs, "inter.asm");
-    //block_list = NULL;
 } 

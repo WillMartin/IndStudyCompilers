@@ -1,0 +1,16 @@
+{
+    bool x = true || false;
+    print(x);
+
+    int q = 5;
+    int a = 0;
+    if (true && q + 32 > 0)
+    {
+        a = 1;
+        print(a);
+    }
+    else
+    {
+        print(a); 
+    }
+}

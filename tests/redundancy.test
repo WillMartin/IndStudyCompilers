@@ -1,14 +1,14 @@
 {
     int x = 1;
+    x = 3;
 
-    while (x < 10)
+    print(x);
+
+    int y = 5;
+    y = y;
+
+    if (true)
     {
-        int y = x;
         print(y);
-        x = x + 1;
-        // Oops! Stupid programming error 
-        x = x;
-        // And another! We don't even care!
-        x = y + 2;
     }
 }

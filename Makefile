@@ -4,20 +4,24 @@ WITH_GLIB=`pkg-config --cflags --libs glib-2.0`
 OUT_FILE=compiler
 INTER_FOLDER=InterCodeUtils
 
-linux_program: all
-	./compiler <<< "{int x= 0; while (x<20) {if (x > 10) { print(x); } x = x + 1;}}"
+
+all: y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o optimization.o gc.o
+	gcc $(CFLAGS) y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o gc.o optimization.o -o $(OUT_FILE) $(WITH_GLIB)
+
+linux_arun: linux_assemble
+	./program
+mac_arun: mac_assemble
+	./program
+
+linux_assemble: 
 	nasm -f elf32 inter.asm 
 	ld -melf_i386 -I/lib32/ld-linux.so.2 -lc -s -o program inter.o
 
-mac_program: all
-	./compiler <<< "{int x= 0; while (x<20) {if (x > 10) { print(x); } x = x + 1;}}"
+mac_assemble: 
 	sed -i bak 's/_start/start/g' inter.asm
 	sed -i bak 's/printf/_printf/g' inter.asm
 	nasm -fmacho inter.asm
 	ld -o program inter.o -lc
-
-all: y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o optimization.o gc.o
-	gcc $(CFLAGS) y.tab.c lex.yy.c symbol_table.o inter_code_gen.o converter.o register.o repr_utils.o gc.o optimization.o -o $(OUT_FILE) $(WITH_GLIB)
 
 # Compile yacc file to C
 # -d command specifies to create a header with token definitions (y.tab.h)
