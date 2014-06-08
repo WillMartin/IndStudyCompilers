@@ -36,8 +36,7 @@ typedef struct Identifier
     bool on_stack; // Whether the most current version is here
     // If a current version must be kept on stack and only grabbed from there
     // primarily for while-loops.
-    // Not boolean in order to basically have a reentrant lock
-    int force_on_stack;
+    bool force_on_stack;
     // This is "its" place on the stack. Should not change!
     int offset; 
     GList *address_descriptor; // Of type Register

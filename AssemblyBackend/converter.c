@@ -827,7 +827,7 @@ void perform_instr_actions(Instruction *instr)
                 if (!action_id->force_on_stack)
                 {
                     fprintf(out_file, "Forcing %s on stack\n", action_id->symbol);
-                    action_id->force_on_stack++;
+                    action_id->force_on_stack = true;
                     // Move it to the stack if we can.
                     /* For example in case  
                        int x = 0;
@@ -857,7 +857,7 @@ void perform_instr_actions(Instruction *instr)
                 break;
             case RELEASE_ID_STACK:
                 fprintf(out_file, "Releasing from %s stack\n", action_id->symbol);
-                action_id->force_on_stack--;
+                action_id->force_on_stack = false;
                 break;
             default:
                 assert(false);
